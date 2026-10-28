@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "branch": "main",
+  "origin": "https://controledefrotasgontijo.netlify.app",
+  "siteName": "controledefrotasgontijo",
+  "repository": "brunagarciagontijo-maker/Controledefrotas",
+  "projectRefSha256": "0377cb2d944e6385d14ec7d0c35eca39ed57886b81d2ed3b4574dee7c94d572f",
+  "publicKeySha256": "78e166b20367c96c81407f819f8745053776669fa861d9d24e480b89d3fe76d1",
+  "release": {
+    "inventorySha256": "3bcbd317a1c3debaf0071edec4505369bfdde759cafa7c0ab173d442313b72f7",
+    "recoveryStrategy": "no-backup-risk-accepted",
+    "recoveryWaiverSha256": "5019d5f4ee694b16af21c9bcc979fdd45fa692ba8de874c6486e99e32052ce2f",
+    "sqlBundleSha256": "9b9fe77f1c6419dff9556ef401442e128ce44acf40c2fab30e175d4067dc7829",
+    "schemaVersion": 5
+  },
+  "templateFiles": {
+    "001_foundation.sql": "3f890fcfe319995114410efd7832abfbd24b6dbbe4677116521a36270d461974",
+    "002_authorization.sql": "027179eb59bcaa3f9265cfbbd351ddade9ac5b1abd63491bd028501f2339fe12",
+    "003_operations.sql": "a686a122aa6b2377e84d6ac2beb4beb1a4ddd6a24e5c4ada18248cca09e8e49c",
+    "004_private_files.sql": "f0123715f299f765947aa08eb5d98b4e646706082716cd5269755c09119c2049",
+    "005_daily_yard_parcels.sql": "1ff8aa23d498373ecf5677d92f50318ecbddafbe8004d2c1770eecb74a95fbe5",
+    "006_physical_checks_timeline.sql": "44e2ef27308381f17d14f41debf59d8f6ccb89f2dba12d8390598afd3cef08f3",
+    "007_oil_checks.sql": "21fae6190ef99d90acaf77740493235f881162d39cb685766cd12fb0df1ad93b"
+  }
+}

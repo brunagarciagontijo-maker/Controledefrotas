@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { reportError } from '../utils/diagnostics';
+import { useAuth } from '../auth/context';
+import { can } from '../auth/authorization';
+import{TimelineView}from'./TimelineView';
+import { CompanyDepartureForm } from './CompanyDepartureForm';
+import { extractDevLookup } from '../lib/environment';
+import { requireDevEnvironment } from '../lib/runtime';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import {
-  Building2,
   Camera,
   ClipboardCheck,
   Edit2,
@@ -11,7 +17,6 @@ import {
   Timer,
   Save,
   Trash2,
-  Truck,
   UserRoundPlus,
   UserCheck,
   Users,
@@ -33,11 +38,12 @@ import type {
   FuelLevel,
   Json,
   OperationalMovement,
-  OperationType,
   VehicleRecord,
 } from '../types/database';
 
 interface OperationalViewProps {
+  initialTab?: OperationalTab;
+  embedded?: boolean;
   initialVehicleLookup?: string;
   initialAccessLookup?: string;
   onSuccess: (message: string) => void;
@@ -50,14 +56,6 @@ type DriverStatusFilter = 'Todos' | 'Ativos' | 'Inativos';
 type DriverSort = 'name' | 'movements';
 type ChecklistItemState = { ok: boolean; note: string };
 type ChecklistGroup = Record<string, ChecklistItemState>;
-type TimelineEvent = {
-  id: string;
-  movement: OperationalMovement;
-  kind: 'saida' | 'entrada';
-  date: string;
-  time: string;
-  driverName: string;
-};
 
 const CHECKLIST_ITEMS = [
   { key: 'pneus', label: 'Pneus e estepe' },
@@ -69,9 +67,7 @@ const CHECKLIST_ITEMS = [
 ] as const;
 
 const FUEL_OPTIONS: FuelLevel[] = ['Reserva', '1/4', '1/2', '3/4', 'Cheio'];
-const OPERATION_OPTIONS: OperationType[] = ['Obras', 'Trajeto curto', 'Viagem'];
 const VEHICLE_STATUS_OPTIONS = ['Ativo', 'Inativo', 'Em Manut.'] as const;
-const TRANSVELENTIM_ALIASES = ['transvelentim', 'transvalentim'];
 
 type PatioVehicleEditForm = {
   plate: string;
@@ -95,50 +91,17 @@ function normalizeLookupValue(value: string) {
   return normalizeText(value).replace(/\s+/g, '');
 }
 
-function isTransvelentimText(value?: string | null) {
-  const normalized = normalizeLookupValue(value || '');
-  return TRANSVELENTIM_ALIASES.some((alias) => normalized.includes(alias));
-}
-
 function formatShortCode(value?: string | null) {
   return value?.trim() || '-----';
 }
 
 function extractLookupValue(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-
-  try {
-    const parsedUrl = new URL(trimmed, window.location.origin);
-    return (
-      parsedUrl.searchParams.get('veiculo') ||
-      parsedUrl.searchParams.get('vehicle') ||
-      parsedUrl.searchParams.get('codigo') ||
-      parsedUrl.searchParams.get('code') ||
-      parsedUrl.searchParams.get('qr') ||
-      trimmed
-    );
-  } catch {
-    return trimmed;
-  }
+  return extractDevLookup(value, ["veiculo","vehicle","codigo","code","qr"], requireDevEnvironment().appUrl);
 }
 
 function getCurrentTimeValue() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
-
-function createEntryFormDefaults() {
-  return {
-    operation_type: 'Obras' as OperationType,
-    driver_id: '',
-    entry_date: toDateInputValue(new Date()),
-    entry_time: getCurrentTimeValue(),
-    entry_odometer: '',
-    entry_fuel_level: '1/2' as FuelLevel,
-    entry_observations: '',
-    qr_identifier: '',
-  };
 }
 
 function createExitFormDefaults() {
@@ -184,9 +147,6 @@ function createMovementChecklistSnapshot(entry: ChecklistGroup, exit: ChecklistG
   return { entry, exit };
 }
 
-function getTimelineTimestamp(event: TimelineEvent) {
-  return `${event.date}T${event.time || '00:00'}:00`;
-}
 
 function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info' }) {
   const tones = {
@@ -225,8 +185,10 @@ function TabButton({
   );
 }
 
-export function OperationalView({ initialVehicleLookup = '', initialAccessLookup = '', onSuccess, onError }: OperationalViewProps) {
-  const [activeTab, setActiveTab] = useState<OperationalTab>(initialAccessLookup ? 'visitantes' : 'retirada');
+export function OperationalView({ initialVehicleLookup = '', initialAccessLookup = '', initialTab, embedded = false, onSuccess, onError }: OperationalViewProps) {
+  const { profile } = useAuth();
+  const canManage = can(profile, 'manage_people');
+  const [activeTab, setActiveTab] = useState<OperationalTab>(initialTab || (initialAccessLookup ? 'visitantes' : 'retirada'));
   const [retiradaView, setRetiradaView] = useState<RetiradaView>('nova');
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [drivers, setDrivers] = useState<DriverRecord[]>([]);
@@ -251,13 +213,6 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
 
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [entrySearch, setEntrySearch] = useState('');
-  const [vehiclePickerSearch, setVehiclePickerSearch] = useState('');
-  const [driverPickerSearch, setDriverPickerSearch] = useState('');
-  const [transvelentimMode, setTransvelentimMode] = useState(false);
-  const [transvelentimDriverName, setTransvelentimDriverName] = useState('');
-  const [entryChecklist, setEntryChecklist] = useState<ChecklistGroup>(createChecklistState());
-  const [entryPhotos, setEntryPhotos] = useState<File[]>([]);
-  const [entryForm, setEntryForm] = useState(() => createEntryFormDefaults());
 
   const [driverForm, setDriverForm] = useState<DriverInput>({
     name: '',
@@ -284,7 +239,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
   const [exitForm, setExitForm] = useState(() => createExitFormDefaults());
   const [movementSaving, setMovementSaving] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setHasLoadedData(false);
 
@@ -298,36 +253,36 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
     if (vehicleResult.status === 'fulfilled') {
       setVehicles(vehicleResult.value);
     } else {
-      console.error('Erro ao carregar veículos para a aba operacional:', vehicleResult.reason);
+      reportError('Erro ao carregar veículos para a aba operacional:', vehicleResult.reason);
       onError('Não foi possível carregar a lista de veículos');
     }
 
     if (driverResult.status === 'fulfilled') {
       setDrivers(driverResult.value);
     } else {
-      console.error('Erro ao carregar motoristas para a aba operacional:', driverResult.reason);
+      reportError('Erro ao carregar motoristas para a aba operacional:', driverResult.reason);
       onError('Não foi possível carregar a lista de motoristas');
     }
 
     if (movementResult.status === 'fulfilled') {
       setMovements(movementResult.value);
     } else {
-      console.error('Erro ao carregar movimentações operacionais:', movementResult.reason);
+      reportError('Erro ao carregar movimentações operacionais:', movementResult.reason);
     }
 
     if (historyResult.status === 'fulfilled') {
       setHistoryRecords(historyResult.value);
     } else {
-      console.error('Erro ao carregar histórico de retiradas:', historyResult.reason);
+      reportError('Erro ao carregar histórico de retiradas:', historyResult.reason);
     }
 
     setLoading(false);
     setHasLoadedData(true);
-  };
+  }, [onError]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const openMovements = useMemo(
     () => movements.filter((movement) => movement.status === 'Em aberto'),
@@ -366,60 +321,14 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
     [vehicles, unavailableVehiclePlates]
   );
 
-  const filteredVehiclesInPatio = useMemo(() => {
-    const search = normalizeLookupValue(vehiclePickerSearch);
-    if (!search) return vehiclesInPatio;
-
-    return vehiclesInPatio.filter((vehicle) =>
-      [vehicle.short_code, vehicle.legacy_short_code || '', vehicle.plate, vehicle.name].some((value) =>
-        normalizeLookupValue(value).includes(search)
-      )
-    );
-  }, [vehiclesInPatio, vehiclePickerSearch]);
-
-  const transvelentimVehicles = useMemo(
-    () =>
-      vehicles.filter(
-        (vehicle) =>
-          vehicle.status === 'Ativo' &&
-          !unavailableVehiclePlates.has(normalizeLookupValue(vehicle.plate)) &&
-          [vehicle.responsible_name, vehicle.fixed_driver_name, vehicle.name, vehicle.plate].some(isTransvelentimText)
-      ),
-    [unavailableVehiclePlates, vehicles]
-  );
-
-  const selectedVehicle = useMemo(
-    () => [...vehiclesInPatio, ...transvelentimVehicles].find((vehicle) => vehicle.id === selectedVehicleId) || null,
-    [transvelentimVehicles, vehiclesInPatio, selectedVehicleId]
-  );
-
   const activeDrivers = useMemo(
     () => drivers.filter((driver) => driver.is_active),
     [drivers]
   );
 
-  const filteredActiveDrivers = useMemo(() => {
-    const search = normalizeLookupValue(driverPickerSearch);
-    if (!search) return activeDrivers;
-
-    return activeDrivers.filter((driver) =>
-      [driver.short_code, driver.name].some((value) => normalizeLookupValue(value).includes(search))
-    );
-  }, [activeDrivers, driverPickerSearch]);
-
-  const selectedDriver = useMemo(
-    () => drivers.find((driver) => driver.id === entryForm.driver_id) || null,
-    [drivers, entryForm.driver_id]
-  );
-
   const selectedReturnDriver = useMemo(
     () => drivers.find((driver) => driver.id === returnDriverId) || null,
     [drivers, returnDriverId]
-  );
-
-  const entryChecklistProgress = useMemo(
-    () => checklistCompletion(entryChecklist),
-    [entryChecklist]
   );
 
   const exitChecklistProgress = useMemo(
@@ -477,35 +386,6 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       });
   }, [driverManagementSearch, driverMovementStats, driverSort, driverStatusFilter, drivers]);
 
-  const timelineEvents = useMemo<TimelineEvent[]>(() => {
-    const events = movements.flatMap((movement) => {
-      const movementEvents: TimelineEvent[] = [
-        {
-          id: `${movement.id}-saida`,
-          movement,
-          kind: 'saida',
-          date: movement.entry_date,
-          time: movement.entry_time,
-          driverName: movement.driver_name || 'Não informado',
-        },
-      ];
-
-      if (movement.exit_date && movement.exit_time) {
-        movementEvents.push({
-          id: `${movement.id}-entrada`,
-          movement,
-          kind: 'entrada',
-          date: movement.exit_date,
-          time: movement.exit_time,
-          driverName: movement.driver_name || 'Não informado',
-        });
-      }
-
-      return movementEvents;
-    });
-
-    return events.sort((a, b) => getTimelineTimestamp(b).localeCompare(getTimelineTimestamp(a)));
-  }, [movements]);
 
   const historyNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -520,8 +400,17 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [historyRecords]);
 
-  const lookupVehicleOrMovement = (value: string) => {
-    const lookupValue = extractLookupValue(value);
+  const openExitModal = useCallback((movement: OperationalMovement) => {
+    setMovementToClose(movement);
+    setReturnDriverId(movement.driver_id || '');
+    setExitChecklist(safeChecklistGroup((movement.checklist as Record<string, Json> | undefined)?.entry));
+    setExitForm(createExitFormDefaults());
+    setExitPhotos([]);
+  }, []);
+
+  const lookupVehicleOrMovement = useCallback((value: string) => {
+    let lookupValue: string;
+    try { lookupValue = extractLookupValue(value); } catch { onError('QR Code fora do ambiente DEV.'); return; }
     const normalized = normalizeLookupValue(lookupValue);
     if (!normalized) {
       onError('Digite uma placa, código ou QR válido');
@@ -590,27 +479,20 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
     setActiveTab('retirada');
     setRetiradaView('nova');
     setSelectedVehicleId(vehicleMatch.id);
-    setEntryForm((prev) => ({ ...prev, qr_identifier: vehicleMatch.short_code || lookupValue }));
     setEntrySearch(vehicleMatch.short_code || vehicleMatch.plate);
     setMessage(`Veículo localizado: ${formatShortCode(vehicleMatch.short_code)} - ${vehicleMatch.plate} - ${vehicleMatch.name}`);
-  };
+  }, [retiradaView, movements, vehicles, unavailableVehiclePlates, openVehicleIds, openMovements, onError, openExitModal]);
 
   useEffect(() => {
     if (!initialVehicleLookup || !hasLoadedData || initialLookupHandled) return;
 
     setInitialLookupHandled(true);
     lookupVehicleOrMovement(initialVehicleLookup);
-  }, [hasLoadedData, initialLookupHandled, initialVehicleLookup, movements, vehicles]);
+  }, [hasLoadedData, initialLookupHandled, initialVehicleLookup, lookupVehicleOrMovement]);
 
-  const openExitModal = (movement: OperationalMovement) => {
-    setMovementToClose(movement);
-    setReturnDriverId(movement.driver_id || '');
-    setExitChecklist(safeChecklistGroup((movement.checklist as Record<string, Json> | undefined)?.entry));
-    setExitForm(createExitFormDefaults());
-    setExitPhotos([]);
-  };
 
   const openVehicleEditModal = (vehicle: FleetVehicle) => {
+    if (!canManage) { onError('Cadastro restrito ao administrador.'); return; }
     setVehicleToEdit(vehicle);
     setVehicleEditForm({
       plate: vehicle.plate,
@@ -677,97 +559,10 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       closeVehicleEditModal();
       await loadData();
     } catch (error) {
-      console.error('Erro ao atualizar veículo do pátio:', error);
+      reportError('Erro ao atualizar veículo do pátio:', error);
       onError('Erro ao salvar alterações do veículo');
     } finally {
       setVehicleEditSaving(false);
-    }
-  };
-
-  const resetEntryForm = () => {
-    setSelectedVehicleId('');
-    setEntrySearch('');
-    setVehiclePickerSearch('');
-    setDriverPickerSearch('');
-    setTransvelentimMode(false);
-    setTransvelentimDriverName('');
-    setEntryChecklist(createChecklistState());
-    setEntryPhotos([]);
-    setEntryForm(createEntryFormDefaults());
-  };
-
-  const handleEntrySubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedVehicle) {
-      onError('Selecione um veículo antes de registrar a saída');
-      return;
-    }
-
-    if (unavailableVehiclePlates.has(normalizeLookupValue(selectedVehicle.plate))) {
-      onError('Esse veículo já está fora do pátio. Registre a entrada para liberá-lo novamente.');
-      return;
-    }
-
-    if (openVehicleIds.has(selectedVehicle.id)) {
-      onError('Esse veículo já está com checklist em aberto');
-      return;
-    }
-
-    if (entryChecklistProgress.checked !== entryChecklistProgress.total) {
-      onError('Marque todos os itens do checklist de saída antes de enviar');
-      return;
-    }
-
-    if (transvelentimMode && !transvelentimDriverName.trim()) {
-      onError('Informe o nome do motorista da Transvalentim');
-      return;
-    }
-
-    const entryOdometer = Number(entryForm.entry_odometer);
-    if (Number.isNaN(entryOdometer) || entryOdometer < 0) {
-      onError('Informe um odômetro de saída válido');
-      return;
-    }
-
-    if (!entryForm.entry_fuel_level) {
-      onError('Informe o nível de combustível na saída');
-      return;
-    }
-
-    try {
-      setMovementSaving(true);
-      const hasTransvelentimDriver = transvelentimDriverName.trim().length > 0;
-      const driverNameForMovement = transvelentimDriverName.trim() || selectedDriver?.name || 'Não informado';
-
-      await operationalService.createMovement(
-        {
-          vehicle_id: selectedVehicle.id,
-          vehicle_plate: selectedVehicle.plate,
-          operation_type: entryForm.operation_type,
-          driver_id: hasTransvelentimDriver ? null : selectedDriver?.id || null,
-          driver_name: driverNameForMovement,
-          driver_cnh_number: hasTransvelentimDriver ? null : selectedDriver?.cnh_number?.trim() || null,
-          driver_cnh_valid_until: hasTransvelentimDriver ? null : selectedDriver?.cnh_valid_until || null,
-          qr_identifier: entryForm.qr_identifier || selectedVehicle.short_code || selectedVehicle.id,
-          entry_date: entryForm.entry_date,
-          entry_time: entryForm.entry_time,
-          entry_odometer: entryOdometer,
-          entry_fuel_level: entryForm.entry_fuel_level,
-          entry_observations: entryForm.entry_observations,
-          checklist: createMovementChecklistSnapshot(createChecklistState(), entryChecklist),
-        },
-        entryPhotos
-      );
-
-      onSuccess('Checklist de saída salvo com sucesso');
-      resetEntryForm();
-      await loadData();
-    } catch (error) {
-      console.error('Erro ao criar movimentação:', error);
-      onError('Erro ao salvar checklist de saída');
-    } finally {
-      setMovementSaving(false);
     }
   };
 
@@ -810,7 +605,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       });
       await loadData();
     } catch (error) {
-      console.error('Erro ao salvar motorista:', error);
+      reportError('Erro ao salvar motorista:', error);
       onError('Erro ao salvar motorista');
     } finally {
       setDriverSaving(false);
@@ -855,7 +650,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       onSuccess('Motorista excluído com sucesso');
       await loadData();
     } catch (error) {
-      console.error('Erro ao excluir motorista:', error);
+      reportError('Erro ao excluir motorista:', error);
       onError('Erro ao excluir motorista');
     } finally {
       setDriverDeletingId(null);
@@ -890,7 +685,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       onSuccess(`${created.length} motorista(s) importado(s) do histórico`);
       await loadData();
     } catch (error) {
-      console.error('Erro ao importar histórico:', error);
+      reportError('Erro ao importar histórico:', error);
       onError('Erro ao importar nomes do histórico');
     } finally {
       setImportingHistory(false);
@@ -954,8 +749,10 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       setExitPhotos([]);
       await loadData();
     } catch (error) {
-      console.error('Erro ao fechar movimentação:', error);
-      onError('Erro ao salvar checklist de entrada');
+      reportError('Erro ao fechar movimentação:', error);
+      if (error instanceof Error && error.message.startsWith('Movimentacao salva.')) { onError(error.message); setMovementToClose(null); }
+      else onError('Erro ao salvar checklist de entrada');
+      await loadData();
     } finally {
       setMovementSaving(false);
     }
@@ -998,7 +795,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1 sm:gap-2">
+      {!embedded && <div className="flex flex-col gap-1 sm:gap-2">
         <h2 className="text-xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 leading-tight">
           <ClipboardCheck className="w-6 h-6 sm:w-7 sm:h-7 text-red-600" />
           Operacional de Pátio e Checklist
@@ -1006,7 +803,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         <p className="text-sm sm:text-base text-gray-600">
           Retirada/devolução, entrada de pessoas, funcionários e motoristas em subabas separadas.
         </p>
-      </div>
+      </div>}
 
       {message && (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -1020,7 +817,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-4 xl:overflow-visible">
+      <div className={embedded ? 'hidden' : 'flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-4 xl:overflow-visible'}>
         <div className="glass min-w-[116px] rounded-xl sm:min-w-0 sm:rounded-2xl p-3 sm:p-5 shadow-premium">
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Em aberto</p>
           <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-red-600">{openMovements.length}</p>
@@ -1041,7 +838,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:gap-3 xl:overflow-visible">
+      <div className={embedded ? 'hidden' : 'flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-5 xl:gap-3 xl:overflow-visible'}>
         <TabButton
           active={activeTab === 'retirada'}
           onClick={() => setActiveTab('retirada')}
@@ -1054,18 +851,22 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
           icon={<UserCheck className="w-4 h-4" />}
           label="Entrada"
         />
+        {canManage && (
         <TabButton
           active={activeTab === 'funcionarios'}
           onClick={() => setActiveTab('funcionarios')}
           icon={<UserRoundPlus className="w-4 h-4" />}
           label="Funcionários"
         />
+        )}
+        {canManage && (
         <TabButton
           active={activeTab === 'motoristas'}
           onClick={() => setActiveTab('motoristas')}
           icon={<Users className="w-4 h-4" />}
           label="Motoristas"
         />
+        )}
         <TabButton
           active={activeTab === 'timeline'}
           onClick={() => setActiveTab('timeline')}
@@ -1082,7 +883,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         />
       )}
 
-      {activeTab === 'funcionarios' && (
+      {canManage && activeTab === 'funcionarios' && (
         <PedestriansView
           onSuccess={onSuccess}
           onError={onError}
@@ -1090,7 +891,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       )}
 
       {activeTab === 'retirada' && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className={embedded ? 'hidden' : 'flex gap-2 overflow-x-auto pb-1'}>
           <button
             type="button"
             onClick={() => setRetiradaView('nova')}
@@ -1118,393 +919,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
       )}
 
       {activeTab === 'retirada' && retiradaView === 'nova' && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <section className="xl:col-span-2 glass rounded-2xl p-4 sm:p-6 shadow-premium">
-            <div className="mb-5 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-red-600" />
-              <h3 className="text-lg font-bold text-gray-900">Checklist de saída</h3>
-            </div>
-
-            <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-red-100 bg-red-50 p-3 text-center text-xs font-semibold text-red-800 sm:hidden">
-              <span>1. Veículo</span>
-              <span>2. Motorista</span>
-              <span>3. Checklist</span>
-            </div>
-
-            <form onSubmit={handleEntrySubmit} className="space-y-6">
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="grid gap-4 bg-slate-950 p-4 text-white sm:grid-cols-[1fr_auto] sm:items-center">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-white/10 p-2">
-                      <Building2 className="h-5 w-5 text-cyan-200" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-cyan-200">Entrada terceirizada</p>
-                      <h4 className="text-lg font-bold leading-tight">Transvalentim</h4>
-                      <p className="mt-1 text-sm text-slate-300">
-                        Selecione o munck da empresa e informe o motorista que chegou no dia.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextMode = !transvelentimMode;
-                      setTransvelentimMode(nextMode);
-                      if (nextMode) {
-                        setEntryForm((prev) => ({ ...prev, driver_id: '', operation_type: 'Obras' }));
-                        setDriverPickerSearch('');
-                      } else {
-                        setTransvelentimDriverName('');
-                      }
-                    }}
-                    className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                      transvelentimMode
-                        ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-200'
-                        : 'bg-white text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Truck className="h-4 w-4" />
-                    {transvelentimMode ? 'Modo ativo' : 'Usar Transvalentim'}
-                  </button>
-                </div>
-
-                {transvelentimMode && (
-                  <div className="space-y-4 p-4">
-                    <div className="space-y-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900">Muncks disponíveis</p>
-                          <p className="text-xs text-gray-500">{transvelentimVehicles.length} placa(s) encontrada(s) no pátio</p>
-                        </div>
-                        <span className="self-start sm:self-auto">
-                          <Badge tone={selectedVehicle && isTransvelentimText(`${selectedVehicle.name} ${selectedVehicle.responsible_name}`) ? 'success' : 'info'}>
-                            {selectedVehicle ? selectedVehicle.plate : 'Selecione'}
-                          </Badge>
-                        </span>
-                      </div>
-
-                      {transvelentimVehicles.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-cyan-300 bg-cyan-50 p-4 text-sm text-cyan-900">
-                          Cadastre as placas da empresa com nome ou responsável contendo Transvalentim para aparecerem aqui.
-                        </div>
-                      ) : (
-                        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                          {transvelentimVehicles.map((vehicle) => (
-                            <button
-                              key={vehicle.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedVehicleId(vehicle.id);
-                                setVehiclePickerSearch(vehicle.plate);
-                                setEntrySearch(vehicle.short_code || vehicle.plate);
-                                setEntryForm((prev) => ({
-                                  ...prev,
-                                  operation_type: 'Obras',
-                                  qr_identifier: vehicle.short_code || vehicle.plate,
-                                }));
-                              }}
-                              className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
-                                selectedVehicleId === vehicle.id
-                                  ? 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-100'
-                                  : 'border-gray-200 bg-gray-50 hover:border-cyan-300 hover:bg-white'
-                              }`}
-                            >
-                              <span className="min-w-0">
-                                <span className="block text-base font-black text-gray-900">{vehicle.plate}</span>
-                                <span className="block truncate text-xs text-gray-600">{vehicle.name}</span>
-                              </span>
-                              <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-gray-500">
-                                {formatShortCode(vehicle.short_code)}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        <UserRoundPlus className="h-4 w-4 text-cyan-700" />
-                        <p className="text-sm font-bold text-gray-900">Motorista do dia</p>
-                      </div>
-                      <Input
-                        label="Nome do motorista"
-                        value={transvelentimDriverName}
-                        onChange={(event) => setTransvelentimDriverName(event.target.value)}
-                        placeholder="Ex: João da Silva"
-                        required={transvelentimMode}
-                      />
-                      <p className="mt-3 text-xs text-gray-500">
-                        O nome fica gravado no checklist desta saída sem prender o motorista a uma placa fixa.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setScannerOpen((prev) => !prev)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100 sm:px-4"
-                    >
-                      {scannerOpen ? 'Fechar câmera' : 'Abrir câmera'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => lookupVehicleOrMovement(entrySearch)}
-                      className="rounded-xl bg-gray-900 px-3 py-3 text-sm font-semibold text-white hover:bg-black sm:px-4"
-                    >
-                      Localizar
-                    </button>
-                  </div>
-
-                  <Input
-                    label="Buscar veículo"
-                    value={entrySearch}
-                    onChange={(event) => setEntrySearch(event.target.value)}
-                    placeholder="Código de 3 dígitos, placa ou QR"
-                  />
-
-                  <BarcodeScanner
-                    open={scannerOpen}
-                    onClose={() => setScannerOpen(false)}
-                    onDetected={(value) => {
-                      lookupVehicleOrMovement(value);
-                      setScannerOpen(false);
-                    }}
-                  />
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Veículo</label>
-                    <input
-                      value={vehiclePickerSearch}
-                      onChange={(event) => setVehiclePickerSearch(event.target.value)}
-                      placeholder="Digite placa, código ou nome"
-                      className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                    />
-                    <select
-                      value={selectedVehicleId}
-                      onChange={(event) => setSelectedVehicleId(event.target.value)}
-                      className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                    >
-                      <option value="">Selecione um veículo disponível no pátio...</option>
-                      {filteredVehiclesInPatio.map((vehicle) => (
-                        <option key={vehicle.id} value={vehicle.id}>
-                          {formatShortCode(vehicle.short_code)} - {vehicle.plate} - {vehicle.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500">
-                      A lista traz apenas veículos disponíveis no pátio. O motorista pode ser trocado sem alterar o veículo.
-                    </p>
-                    {selectedVehicle && (
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-                        <div className="font-semibold text-gray-900">{selectedVehicle.plate}</div>
-                        <div>{selectedVehicle.name}</div>
-                        <div className="text-xs text-gray-500">Código: {formatShortCode(selectedVehicle.short_code)}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Motorista</label>
-                    <input
-                      value={driverPickerSearch}
-                      onChange={(event) => setDriverPickerSearch(event.target.value)}
-                      placeholder="Digite nome ou código"
-                      disabled={transvelentimMode}
-                      className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                    />
-                    <select
-                      value={entryForm.driver_id}
-                      onChange={(event) => setEntryForm((prev) => ({ ...prev, driver_id: event.target.value }))}
-                      disabled={transvelentimMode}
-                      className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                    >
-                      <option value="">Selecione um motorista...</option>
-                      {filteredActiveDrivers
-                        .map((driver) => (
-                          <option key={driver.id} value={driver.id}>
-                            {formatShortCode(driver.short_code)} - {driver.name}
-                          </option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-gray-500">
-                      O motorista é apenas uma informação da operação e pode ser alterado sem mudar o veículo.
-                    </p>
-                    {transvelentimMode ? (
-                      <p className="text-xs text-cyan-700">Motorista informado no painel da Transvalentim acima.</p>
-                    ) : !selectedDriver && (
-                      <p className="text-xs text-amber-700">Nenhum motorista selecionado. Você pode escolher ou trocar antes de salvar.</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">Tipo de operação</label>
-                      <select
-                        value={entryForm.operation_type}
-                        onChange={(event) =>
-                          setEntryForm((prev) => ({ ...prev, operation_type: event.target.value as OperationType }))
-                        }
-                        className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                      >
-                        {OPERATION_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">Combustível *</label>
-                      <select
-                        value={entryForm.entry_fuel_level}
-                        onChange={(event) =>
-                          setEntryForm((prev) => ({ ...prev, entry_fuel_level: event.target.value as FuelLevel }))
-                        }
-                        className="w-full rounded-xl border-2 border-gray-200 bg-white px-4 py-3 focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                      >
-                        {FUEL_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input
-                      label="Data de saída"
-                      type="date"
-                      value={entryForm.entry_date}
-                      onChange={(event) => setEntryForm((prev) => ({ ...prev, entry_date: event.target.value }))}
-                    />
-                    <Input
-                      label="Hora de saída"
-                      type="time"
-                      value={entryForm.entry_time}
-                      onChange={(event) => setEntryForm((prev) => ({ ...prev, entry_time: event.target.value }))}
-                    />
-                  </div>
-
-                  <Input
-                    label="Odômetro de saída"
-                    type="number"
-                    min="0"
-                    value={entryForm.entry_odometer}
-                    onChange={(event) => setEntryForm((prev) => ({ ...prev, entry_odometer: event.target.value }))}
-                    placeholder="Ex: 125430"
-                  />
-
-                  <Textarea
-                    label="Observações de saída"
-                    value={entryForm.entry_observations}
-                    onChange={(event) => setEntryForm((prev) => ({ ...prev, entry_observations: event.target.value }))}
-                    placeholder="Observações da saída"
-                    rows={4}
-                  />
-                </div>
-
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-semibold text-gray-900">Checklist de saída</h4>
-                      <p className="text-sm text-gray-500">Modelo fixo com observações por item</p>
-                    </div>
-                    <Badge tone="info">
-                      {entryChecklistProgress.checked}/{entryChecklistProgress.total}
-                    </Badge>
-                  </div>
-
-                  {renderChecklist(entryChecklist, setEntryChecklist)}
-
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <Camera className="w-4 h-4 text-red-600" />
-                      Anexar fotos da saída
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      multiple
-                      onChange={(event) => setEntryPhotos(event.target.files ? Array.from(event.target.files) : [])}
-                      className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-xl file:border-0 file:bg-red-600 file:px-4 file:py-2 file:text-white file:font-semibold hover:file:bg-red-700"
-                    />
-                    {entryPhotos.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {entryPhotos.map((file) => (
-                          <Badge key={`${file.name}-${file.size}`}>{file.name}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={resetEntryForm}
-                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-100"
-                >
-                  Limpar formulário
-                </button>
-                <button
-                  type="submit"
-                  disabled={movementSaving || entryChecklistProgress.checked !== entryChecklistProgress.total}
-                  className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                >
-                  {movementSaving ? 'Salvando...' : 'Salvar checklist de saída'}
-                </button>
-              </div>
-            </form>
-          </section>
-
-          <section className="glass rounded-2xl p-4 sm:p-6 shadow-premium">
-            <div className="mb-5 flex items-center gap-2">
-              <Truck className="w-5 h-5 text-red-600" />
-              <h3 className="text-lg font-bold text-gray-900">Veículos no pátio</h3>
-            </div>
-
-            <div className="space-y-3 max-h-[760px] overflow-y-auto pr-1">
-              {vehiclesInPatio.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
-                  Nenhum veículo disponível no pátio.
-                </div>
-              ) : (
-                vehiclesInPatio.map((vehicle) => (
-                  <div key={vehicle.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-gray-900">{vehicle.plate}</p>
-                        <p className="text-sm text-gray-600">{vehicle.name}</p>
-                        <p className="text-xs text-gray-500">Código: {formatShortCode(vehicle.short_code)}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge tone="success">Disponível</Badge>
-                        <button
-                          type="button"
-                          onClick={() => openVehicleEditModal(vehicle)}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          Editar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
+        <div className="space-y-4"><CompanyDepartureForm key={selectedVehicleId || 'nova'} vehicles={vehiclesInPatio} drivers={activeDrivers} initialVehicleId={selectedVehicleId} onError={onError} onSuccess={() => { onSuccess('Saida registrada.'); setRetiradaView('devolucao'); void loadData(); }} />{canManage&&<details className="rounded-xl border bg-white p-4"><summary className="cursor-pointer font-semibold">Editar cadastro de veículo no pátio</summary><div className="mt-3 flex flex-wrap gap-2">{vehiclesInPatio.map(vehicle=><button key={vehicle.id} type="button" className="rounded-xl border px-4 py-3" onClick={()=>openVehicleEditModal(vehicle)}>{vehicle.plate} · Editar</button>)}</div></details>}</div>
       )}
 
       {activeTab === 'retirada' && retiradaView === 'devolucao' && (
@@ -1592,7 +1007,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         </section>
       )}
 
-      {activeTab === 'motoristas' && (
+      {canManage && activeTab === 'motoristas' && (
         <div className="space-y-6">
           <section className="grid grid-cols-2 gap-3">
             {[
@@ -1799,55 +1214,7 @@ export function OperationalView({ initialVehicleLookup = '', initialAccessLookup
         </div>
       )}
 
-      {activeTab === 'timeline' && (
-        <section className="glass rounded-2xl p-6 shadow-premium">
-          <div className="mb-5 flex items-center gap-2">
-            <Timer className="w-5 h-5 text-red-600" />
-            <h3 className="text-lg font-bold text-gray-900">Timeline</h3>
-          </div>
-
-          <div className="relative">
-            {timelineEvents.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-gray-500">
-                Nenhuma movimentação operacional registrada.
-              </div>
-            ) : (
-              <div className="relative pl-7">
-                <div className="absolute left-3 top-3 bottom-3 w-px bg-gray-200" />
-                <div className="space-y-4">
-                  {timelineEvents.map((event) => (
-                    <div key={event.id} className="relative">
-                      <div
-                        className={`absolute -left-[1.9rem] top-5 h-4 w-4 rounded-full border-4 border-white shadow ${
-                          event.kind === 'saida' ? 'bg-red-500' : 'bg-green-500'
-                        }`}
-                      />
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="font-bold text-gray-900">
-                              {event.driverName} {event.kind === 'saida' ? 'retirou' : 'devolveu'} {event.movement.vehicle_plate}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {event.kind === 'saida' ? 'Saiu do pátio' : 'Voltou para o pátio'} em {formatDateBR(event.date)} às {event.time}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Código {formatShortCode(event.movement.short_code)} | {event.movement.operation_type}
-                            </p>
-                          </div>
-                          <Badge tone={event.kind === 'saida' ? 'danger' : 'success'}>
-                            {event.kind === 'saida' ? 'Saída' : 'Entrada'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      {activeTab==='timeline'&&<TimelineView onError={onError}/>}
 
       <Modal
         isOpen={!!movementToClose}

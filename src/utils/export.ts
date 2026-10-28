@@ -1,3 +1,4 @@
+import { escapeHtml, csvCell } from './html';
 import type { VehicleRecord, FleetVehicle } from '../types/database';
 import { formatDateBR } from './date';
 
@@ -38,7 +39,7 @@ export function exportToCSV(records: VehicleRecord[]) {
 
   const csvContent = [
     headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ...rows.map((row) => row.map(csvCell).join(',')),
   ].join('\n');
 
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -87,8 +88,8 @@ export function exportDailyUtilizationExcel(records: VehicleRecord[], vehicles: 
 
   const csvContent = [
     recordHeaders.join(';'),
-    ...recordRows.map((row) => row.map((cell) => `"${cell}"`).join(';')),
-    ...vehicleRows.map((row) => row.map((cell) => `"${cell}"`).join(';')),
+    ...recordRows.map((row) => row.map(csvCell).join(';')),
+    ...vehicleRows.map((row) => row.map(csvCell).join(';')),
   ].join('\n');
 
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -231,7 +232,7 @@ export function generatePrintReport(
           ? `
         <div class="filters">
           <strong>Filtros aplicados:</strong>
-          ${filterInfo.map((info) => `<p>• ${info}</p>`).join('')}
+          ${filterInfo.map((info) => `<p>• ${escapeHtml(info)}</p>`).join('')}
         </div>
       `
           : ''
@@ -269,11 +270,11 @@ export function generatePrintReport(
             .map(
               (record) => `
             <tr>
-              <td>${record.vehicle_plate}</td>
+              <td>${escapeHtml(record.vehicle_plate)}</td>
               <td>${getRecordUsageType(record)}</td>
-              <td>${record.reason}</td>
+              <td>${escapeHtml(record.reason)}</td>
               <td>${formatDateBR(record.pickup_date)} ${record.pickup_time}</td>
-              <td>${record.pickup_name}</td>
+              <td>${escapeHtml(record.pickup_name)}</td>
               <td>${
                 record.return_date
                   ? `${formatDateBR(record.return_date)} ${record.return_time}`

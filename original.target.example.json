@@ -1,0 +1,9 @@
+{
+  "environment": "original",
+  "projectRef": "",
+  "publicKeySha256": "",
+  "appOrigin": "http://127.0.0.1:5173",
+  "remoteEnabled": false,
+  "access": "metadata-only",
+  "authorization": "ORIGINAL SOMENTE LEITURA"
+}

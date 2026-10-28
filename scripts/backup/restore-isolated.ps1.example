@@ -1,0 +1,26 @@
+# MODELO BLOQUEADO. Este arquivo nao e um restaurador pronto para execucao.
+throw 'BLOQUEADO: destino isolado, isolamento de rede, cobertura e plano de restauracao ainda precisam de aprovacao.'
+<#
+EXEMPLOS A ADAPTAR PRIVADAMENTE PELO ADMINISTRADOR. SOMENTE NA COPIA APROVADA.
+Nunca usar o servico portaria_source para pg_restore/psql de restauracao.
+Credenciais PGSERVICEFILE/PGPASSFILE fora do repo e rotulo de destino nao bastam:
+conferir IP real/host/porta/projeto, firewall com egress negado e identidade da instancia.
+
+$privateRun = 'DIRETORIO_CRIPTOGRAFADO_FORA_DO_REPOSITORIO'
+& pg_restore --list --file=(Join-Path $privateRun 'toc.private.txt') (Join-Path $privateRun 'database.full.dump')
+# Preparar e aprovar roles/TOC/SQL do DESTINO, sem editar o arquivo mestre.
+# TOC deve separar definicoes gerenciadas ja presentes, dados Auth/Storage/historico,
+# customizacoes, owners/grants, sequencias, extensoes, jobs e subscriptions.
+# Jobs, subscriptions e integrações nunca sao ativados durante este ensaio.
+# Servicos Auth/Storage/Realtime/cron parados na importacao; egress negado antes.
+
+& pg_restore --dbname='service=portaria_restore_lab' --no-password --exit-on-error --single-transaction --use-list=(Join-Path $privateRun 'toc.reviewed.private.txt') (Join-Path $privateRun 'database.full.dump') 2> (Join-Path $privateRun 'restore.private.log')
+# Exemplo nao resolve conflitos managed schemas nem desativa triggers sozinho.
+# Se for necessario session_replication_role=replica, aprovar somente no alvo isolado,
+# por sessao de importacao e com validacao integral de FKs/constraints depois.
+# Nao usar --clean, --create, ignorar erros ou remover linhas com regex cega.
+# Nao copiar arquivos brutos para volumes/storage; importar por S3/Storage API no alvo.
+# Validar bytes com novo download LOCAL da copia restaurada e comparar metadados.
+# Migrations 001..006 terao destinos, marcadores e recibos EXCLUSIVOS do laboratorio.
+# Nao invocar original:authorize-write nem liberar original.target.local.json para o ensaio.
+#>

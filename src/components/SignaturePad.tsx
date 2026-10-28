@@ -1,3 +1,4 @@
+import { safeSignatureSource } from '../utils/signature';
 import { useRef, useState, useEffect } from 'react';
 import { Trash2, Check, PenTool, AlertCircle } from 'lucide-react';
 
@@ -8,12 +9,13 @@ interface SignaturePadProps {
   required?: boolean;
   error?: string;
   disabled?: boolean;
+  format?: 'image/png' | 'image/jpeg';
 }
 
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 250;
 
-export function SignaturePad({ value, onChange, label, required, error, disabled }: SignaturePadProps) {
+export function SignaturePad({ value, onChange, label, required, error, disabled, format = 'image/jpeg' }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
@@ -38,12 +40,19 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    console.log('✅ Canvas inicializado:', { width: canvas.width, height: canvas.height });
   }, []);
 
   // Carregar assinatura salva
   useEffect(() => {
-    if (value && canvasRef.current) {
+    if (!value && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      context?.clearRect(0, 0, canvas.width, canvas.height);
+      if (context) { context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height); }
+      setIsEmpty(true); setHasDrawn(false);
+      return;
+    }
+    if (safeSignatureSource(value) && canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (ctx) {
@@ -57,12 +66,12 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
           ctx.drawImage(img, 0, 0);
           setIsEmpty(false);
           setHasDrawn(true);
-          console.log('📸 Assinatura carregada do banco (JPEG)');
         };
         img.onerror = () => {
           console.error('❌ Erro ao carregar assinatura');
         };
-        img.src = value;
+        img.src = safeSignatureSource(value);
+        return () => { img.onload = null; };
       }
     }
   }, [value]);
@@ -98,7 +107,6 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
       return;
     }
 
-    console.log('✏️ Começou a desenhar em:', { x, y });
     setIsDrawing(true);
     
     ctx.beginPath();
@@ -147,7 +155,6 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
   const stopDrawing = () => {
     if (!isDrawing) return;
 
-    console.log('⏹️ Parou de desenhar');
     setIsDrawing(false);
     setIsEmpty(false);
 
@@ -181,29 +188,8 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
       }
     }
 
-    console.log('🔍 Análise canvas:', { 
-      hasPixels,
-      totalPixels: canvas.width * canvas.height,
-      width: canvas.width,
-      height: canvas.height
-    });
-
-    // Usar JPEG com qualidade 0.4 para reduzir tamanho drasticamente
-    const signature = canvas.toDataURL('image/jpeg', 0.4);
-    const size = signature.length;
-
-    console.log('📝 Assinatura capturada:', {
-      tamanho: size + ' caracteres',
-      formato: 'JPEG 40% qualidade',
-      primeiros50chars: signature.substring(0, 50),
-      temConteudo: size > 1000,
-      hasPixels
-    });
-
-    if (!hasPixels && hasDrawn) {
-      console.warn('⚠️ Canvas vazio mas hasDrawn=true. Pode ser problema de escala.');
-    }
-
+    if (!hasPixels) { setIsEmpty(true); onChange(''); return; }
+    const signature = canvas.toDataURL(format, 0.4);
     onChange(signature);
   };
 
@@ -219,7 +205,6 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
 
     setIsEmpty(true);
     setHasDrawn(false);
-    console.log('🗑️ Assinatura limpa');
     onChange('');
   };
 
@@ -255,6 +240,7 @@ export function SignaturePad({ value, onChange, label, required, error, disabled
           )}
           
           <canvas
+            aria-label={label}
             ref={canvasRef}
             width={CANVAS_WIDTH}
             height={CANVAS_HEIGHT}

@@ -1,6 +1,13 @@
 [build]
-  command = "npm run build"
+  command = "npm run build:netlify"
   publish = "dist"
+  ignore = "node scripts/netlify-ignore.mjs"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[context.production.environment]
+  VITE_PUBLIC_APP_URL = "https://controledefrotasgontijo.netlify.app"
 
 [[redirects]]
   from = "/*"

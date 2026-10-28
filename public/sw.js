@@ -1,6 +1,5 @@
 // Service Worker para Sistema de Controle de Frotas
 const CACHE_NAME = 'frotas-v1';
-const apiUrl = 'https://zxtboztqvnekcmvpzrdx.supabase.co';
 
 // Arquivos para fazer cache na instalação
 const STATIC_ASSETS = [
@@ -31,7 +30,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName.startsWith('frotas-v') && cacheName !== CACHE_NAME) {
             console.log('[Service Worker] Deletando cache antigua:', cacheName);
             return caches.delete(cacheName);
           }
@@ -45,7 +44,9 @@ self.addEventListener('activate', (event) => {
 // Fetch event - estratégia Network First com fallback para cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
   // Se for requisição para Supabase API, sempre use network
   if (url.hostname.includes('supabase.co')) {

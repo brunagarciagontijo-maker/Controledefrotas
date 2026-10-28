@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, useState } from 'react';
+import { InputHTMLAttributes, useId, useState } from 'react';
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -8,6 +8,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ label, error, success, required, className = '', type = 'text', ...props }: InputProps) {
+  const generatedId=useId();
+  const inputId=props.id||generatedId;
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isPassword = type === 'password';
@@ -15,12 +17,15 @@ export function Input({ label, error, success, required, className = '', type = 
 
   return (
     <div className="space-y-2 input-enhanced">
-      <label className="block text-sm font-semibold text-gray-700 transition-colors">
+      <label htmlFor={inputId} className="block text-sm font-semibold text-gray-700 transition-colors">
         {label} {required && <span className="text-red-500 text-base">*</span>}
       </label>
       <div className="relative group">
         {/* Input com estilo premium */}
         <input
+          id={inputId}
+          required={required}
+          aria-invalid={Boolean(error)}
           type={inputType}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

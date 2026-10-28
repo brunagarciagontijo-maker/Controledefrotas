@@ -1,3 +1,6 @@
+-- REFERENCIA LEGADA. NAO EXECUTAR NO PROJETO DEV.
+-- Preparacao atual: supabase/dev e DEV_SETUP.md. Este arquivo nao e um schema completo.
+
 -- ============================================================================
 -- Sistema de Controle de Frotas - Banco de Dados Supabase
 -- Arquivo único com todas as tabelas e configurações necessárias

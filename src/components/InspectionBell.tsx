@@ -1,3 +1,4 @@
+import { reportError } from '../utils/diagnostics';
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCircle2, ClipboardCheck } from 'lucide-react';
 import { Modal } from './Modal';
@@ -5,10 +6,6 @@ import { Textarea } from './Textarea';
 import { inspectionService } from '../services/inspectionService';
 import { formatDateBR } from '../utils/date';
 import type { VehicleInspectionRequest } from '../types/database';
-
-interface InspectionBellProps {
-  completedBy: string;
-}
 
 const INSPECTION_CHECKLIST_ITEMS = [
   { key: 'pneus', label: 'Pneus e estepe' },
@@ -28,7 +25,7 @@ function createChecklistState(): ChecklistState {
   }, {});
 }
 
-export function InspectionBell({ completedBy }: InspectionBellProps) {
+export function InspectionBell() {
   const [requests, setRequests] = useState<VehicleInspectionRequest[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [requestToComplete, setRequestToComplete] = useState<VehicleInspectionRequest | null>(null);
@@ -41,7 +38,7 @@ export function InspectionBell({ completedBy }: InspectionBellProps) {
       const data = await inspectionService.listRequests();
       setRequests(data);
     } catch (error) {
-      console.error('Erro ao carregar solicitações de inspeção:', error);
+      reportError('Erro ao carregar solicitações de inspeção:', error);
     }
   };
 
@@ -69,11 +66,11 @@ export function InspectionBell({ completedBy }: InspectionBellProps) {
 
     try {
       setSaving(true);
-      await inspectionService.completeRequest(requestToComplete.id, completedBy, checklist, completedNotes);
+      await inspectionService.completeRequest(requestToComplete.id, checklist, completedNotes);
       setRequestToComplete(null);
       await loadRequests();
     } catch (error) {
-      console.error('Erro ao concluir inspeção:', error);
+      reportError('Erro ao concluir inspeção:', error);
     } finally {
       setSaving(false);
     }
@@ -86,6 +83,7 @@ export function InspectionBell({ completedBy }: InspectionBellProps) {
         onClick={() => setPanelOpen(true)}
         className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
         title="Inspeções de veículo"
+        aria-label="Inspeções de veículo"
       >
         <Bell className="h-5 w-5" />
         {pendingRequests.length > 0 && (
@@ -109,7 +107,7 @@ export function InspectionBell({ completedBy }: InspectionBellProps) {
                     <p className="font-bold text-gray-900">{request.vehicle_plate}</p>
                     <p className="text-sm text-gray-600">{request.vehicle_name}</p>
                     <p className="text-xs text-gray-500">
-                      Solicitado por {request.requested_by} em {formatDateBR(request.created_at.split('T')[0])}
+                      Solicitado por {request.requested_by} em {formatDateBR(request.created_at)}
                     </p>
                     {request.notes && <p className="mt-1 text-sm text-gray-700">{request.notes}</p>}
                   </div>

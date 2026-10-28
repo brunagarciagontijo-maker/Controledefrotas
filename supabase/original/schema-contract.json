@@ -1,0 +1,1137 @@
+{
+  "source": "Metadados fornecidos localmente pelo painel em 2026-10-27. Sem registros pessoais.",
+  "inventorySha256": "3bcbd317a1c3debaf0071edec4505369bfdde759cafa7c0ab173d442313b72f7",
+  "columns": [
+    {
+      "table": "access_records",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "person_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "person_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "person_type",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "host_person_id",
+      "type": "uuid",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "host_person_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "personal_vehicle_id",
+      "type": "uuid",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "vehicle_plate",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "reason",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "entry_date",
+      "type": "date",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "entry_time",
+      "type": "time",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "exit_date",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "exit_time",
+      "type": "time",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "document_file_path",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "document_file_name",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "document_file_type",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "access_records",
+      "name": "observations",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "access_records",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_number",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_valid_until",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "phone",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "notes",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "origin",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "is_active",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_file_path",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_file_url",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_file_name",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "drivers",
+      "name": "cnh_file_type",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "movement_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "phase",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "item_key",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "item_label",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "is_ok",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "note",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_checklist_items",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "vehicle_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "vehicle_plate",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "operation_type",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "driver_id",
+      "type": "uuid",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "driver_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "driver_cnh_number",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "driver_cnh_valid_until",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "qr_identifier",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "entry_date",
+      "type": "date",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "entry_time",
+      "type": "time",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "entry_odometer",
+      "type": "numeric",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "entry_fuel_level",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "entry_observations",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "exit_date",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "exit_time",
+      "type": "time",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "exit_odometer",
+      "type": "numeric",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "exit_fuel_level",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "operational_movements",
+      "name": "exit_observations",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "checklist",
+      "type": "jsonb",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_movements",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_photos",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "operational_photos",
+      "name": "movement_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_photos",
+      "name": "phase",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_photos",
+      "name": "file_path",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_photos",
+      "name": "file_url",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "operational_photos",
+      "name": "caption",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "operational_photos",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "person_type",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "document_number",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "phone",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "company",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "notes",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "cnh_number",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "cnh_valid_until",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "cnh_file_path",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "cnh_file_url",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "cnh_file_name",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "cnh_file_type",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "people",
+      "name": "origin",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "is_active",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "people",
+      "name": "is_driver",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "person_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "plate",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "name",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "notes",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "is_active",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "personal_vehicles",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "vehicle_id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "vehicle_plate",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "vehicle_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "requested_by",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "notes",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "checklist",
+      "type": "jsonb",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "completed_by",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "completed_notes",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_inspection_requests",
+      "name": "completed_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_records",
+      "name": "vehicle_plate",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "reason",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "authorized_by",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "pickup_date",
+      "type": "date",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "pickup_time",
+      "type": "time",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "pickup_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "pickup_signature",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "return_date",
+      "type": "date",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "return_time",
+      "type": "time",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "return_name",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "return_signature",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicle_records",
+      "name": "observations",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_records",
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_records",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_records",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicle_records",
+      "name": "usage_type",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "plate",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicles",
+      "name": "name",
+      "type": "text",
+      "nullable": false,
+      "has_default": false
+    },
+    {
+      "table": "vehicles",
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "created_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "updated_at",
+      "type": "timestamptz",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "responsible_name",
+      "type": "text",
+      "nullable": true,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "short_code",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "in_patio",
+      "type": "bool",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "usage_type",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    },
+    {
+      "table": "vehicles",
+      "name": "legacy_short_code",
+      "type": "text",
+      "nullable": true,
+      "has_default": false
+    },
+    {
+      "table": "vehicles",
+      "name": "fixed_driver_name",
+      "type": "text",
+      "nullable": false,
+      "has_default": true
+    }
+  ],
+  "migrationVersions": [
+    "20260304132509",
+    "20260305111000",
+    "20260601120000",
+    "20260601153000",
+    "20260601160000",
+    "20260601172000",
+    "20260601174000",
+    "20260601175000",
+    "20260601182000",
+    "20260601183000",
+    "20260601184000",
+    "20260605130000",
+    "20260608100000",
+    "20260609120000",
+    "20260609143000",
+    "20260609170000",
+    "20260702100000",
+    "20260702103000",
+    "20260702104000",
+    "20260720175616",
+    "20260908120000"
+  ],
+  "buckets": [
+    {
+      "id": "access-documents",
+      "public": false,
+      "file_size_limit": null,
+      "allowed_mime_types": null
+    },
+    {
+      "id": "driver-cnh-documents",
+      "public": true,
+      "file_size_limit": null,
+      "allowed_mime_types": null
+    },
+    {
+      "id": "person-documents",
+      "public": false,
+      "file_size_limit": null,
+      "allowed_mime_types": null
+    },
+    {
+      "id": "vehicle-operation-photos",
+      "public": true,
+      "file_size_limit": null,
+      "allowed_mime_types": null
+    }
+  ],
+  "functions": [
+    {
+      "schema": "public",
+      "name": "generate_short_code",
+      "arguments": "regclass",
+      "security_definer": false,
+      "definition_hash": "b6a35c24403902abbe7ed1e4934b11b0"
+    },
+    {
+      "schema": "public",
+      "name": "generate_vehicle_mobile_code",
+      "arguments": "",
+      "security_definer": false,
+      "definition_hash": "8a83bdad66f0935cb187ec8ac34185cf"
+    },
+    {
+      "schema": "public",
+      "name": "update_updated_at_column",
+      "arguments": "",
+      "security_definer": false,
+      "definition_hash": "9ec0f0d52b3f89310b9a927257695bdd"
+    }
+  ],
+  "managedStorageGuards": [
+    {
+      "table": "buckets",
+      "name": "enforce_bucket_name_length_trigger",
+      "function": "enforce_bucket_name_length"
+    },
+    {
+      "table": "buckets",
+      "name": "protect_bucket_control_insert",
+      "function": "protect_bucket_control_columns"
+    },
+    {
+      "table": "buckets",
+      "name": "protect_bucket_control_update",
+      "function": "protect_bucket_control_columns"
+    },
+    {
+      "table": "buckets",
+      "name": "protect_bucket_control_update_role",
+      "function": "enforce_bucket_lifecycle_service_role"
+    },
+    {
+      "table": "buckets",
+      "name": "protect_buckets_delete",
+      "function": "protect_delete"
+    },
+    {
+      "table": "objects",
+      "name": "protect_objects_delete",
+      "function": "protect_delete"
+    },
+    {
+      "table": "objects",
+      "name": "update_objects_updated_at",
+      "function": "update_updated_at_column"
+    }
+  ]
+}

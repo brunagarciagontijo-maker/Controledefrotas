@@ -21,5 +21,18 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.*
+!.env.example
+devcloud.target.local.json
+original.target.local.json
+.cache/
+.secrets/
+.netlify/
+*.pem
+*.key
+*.p12
+*.pfx
+playwright-report/
+test-results/
 carteira de motoristas/
 supabase/.temp/

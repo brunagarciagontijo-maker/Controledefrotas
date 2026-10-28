@@ -1,4 +1,8 @@
-import { useState, useEffect } from 'react';
+import { reportError } from '../utils/diagnostics';
+import { useAuth } from '../auth/context';
+import { can } from '../auth/authorization';
+import { requireDevEnvironment } from '../lib/runtime';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, Download, Printer, Eye, Edit2, Trash2, BarChart3, TrendingUp, CheckCircle2, Plus, FileSpreadsheet, LogIn } from 'lucide-react';
 import { vehicleService } from '../services/vehicleService';
 import { vehicleCatalogService } from '../services/vehicleCatalogService';
@@ -16,6 +20,10 @@ interface DatabaseViewProps {
 }
 
 export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseViewProps) {
+  const { profile } = useAuth();
+  const canDelete = can(profile, 'delete_records') && requireDevEnvironment().mode !== 'original' && requireDevEnvironment().projectRef !== 'offline';
+  const canEdit = can(profile, 'manage_catalog');
+  const canEditRecord = (record: VehicleRecord) => record.status === 'Em uso' || canEdit;
   const [filteredRecords, setFilteredRecords] = useState<VehicleRecord[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<FleetVehicle[]>([]);
   const [allVehicles, setAllVehicles] = useState<FleetVehicle[]>([]);
@@ -32,54 +40,47 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
   const [recordToEdit, setRecordToEdit] = useState<VehicleRecord | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📥 Carregando registros do Supabase...');
       const data = await vehicleService.listRecords({
         search: searchTerm,
         status: statusFilter,
         startDate: recordFilterStart,
         endDate: recordFilterEnd,
       });
-      console.log(`✅ ${data.length} registro(s) carregado(s)`, data);
       setFilteredRecords(data);
     } catch (error) {
-      console.error('Error loading records:', error);
+      reportError('Error loading records:', error);
       onError('Erro ao carregar registros');
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, statusFilter, recordFilterStart, recordFilterEnd, onError]);
 
-  const loadVehiclesByDate = async () => {
+  const loadVehiclesByDate = useCallback(async () => {
     try {
       const allVehicles = await vehicleCatalogService.listVehicles();
       setAllVehicles(allVehicles);
-      console.log('📊 Veículos carregados:', allVehicles);
-      
       if (vehicleFilterStart) {
         const selectedEnd = vehicleFilterEnd || vehicleFilterStart;
         const filterStart = vehicleFilterStart <= selectedEnd ? vehicleFilterStart : selectedEnd;
         const filterEnd = vehicleFilterStart <= selectedEnd ? selectedEnd : vehicleFilterStart;
         
-        console.log('Filtrando veículos entre:', filterStart, 'e', filterEnd);
-
         const filtered = allVehicles.filter(v => {
           const createdDateStr = getDateKey(v.created_at);
           if (!createdDateStr) return false;
           return createdDateStr >= filterStart && createdDateStr <= filterEnd;
         });
         
-        console.log('Veículos filtrados:', filtered);
         setFilteredVehicles(filtered);
       } else {
         setFilteredVehicles(allVehicles);
       }
     } catch (error) {
-      console.error('Erro ao carregar veículos:', error);
+      reportError('Erro ao carregar veículos:', error);
     }
-  };
+  }, [vehicleFilterStart, vehicleFilterEnd]);
 
   useEffect(() => {
     // Pré-popular com a data de hoje ao montar o componente
@@ -90,19 +91,20 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
 
   useEffect(() => {
     loadRecords();
-  }, [refreshTrigger, searchTerm, statusFilter, recordFilterStart, recordFilterEnd]);
+  }, [refreshTrigger, loadRecords]);
 
   useEffect(() => {
     loadVehiclesByDate();
-  }, [vehicleFilterStart, vehicleFilterEnd]);
+  }, [loadVehiclesByDate]);
 
   const handleDelete = async (id: string) => {
+    if (!canDelete) { onError('Exclusao restrita ao administrador.'); return; }
     try {
       await vehicleService.deleteRecord(id);
       onSuccess('Registro excluído com sucesso');
       loadRecords();
     } catch (error) {
-      console.error('Error deleting record:', error);
+      reportError('Error deleting record:', error);
       onError('Erro ao excluir registro');
     } finally {
       setDeleteConfirm(null);
@@ -110,6 +112,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
   };
 
   const handleEdit = (record: VehicleRecord) => {
+    if (record.status !== 'Em uso' && !canEdit) { onError('Edicao restrita ao administrador.'); return; }
     setRecordToEdit(record);
     setIsEditOpen(true);
   };
@@ -178,6 +181,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
 
           <div className="flex flex-wrap gap-3 w-full lg:w-auto">
             <select
+              aria-label="Status dos registros anteriores"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="flex-1 sm:flex-none min-w-[140px] px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-red-100 focus:border-red-500 transition-all bg-white text-gray-900 font-medium hover:border-gray-300 cursor-pointer"
@@ -189,6 +193,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
 
             <input
               type="date"
+              aria-label="Registros desde"
               value={recordFilterStart}
               onChange={(e) => setRecordFilterStart(e.target.value)}
               placeholder="Data inicial"
@@ -197,6 +202,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
 
             <input
               type="date"
+              aria-label="Registros até"
               value={recordFilterEnd}
               onChange={(e) => setRecordFilterEnd(e.target.value)}
               placeholder="Data final"
@@ -396,12 +402,13 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                             }}
                             className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                             title="Ver detalhes"
+                            aria-label="Ver detalhes"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           {record.status === 'Em uso' ? (
                             <button
-                              onClick={() => handleEdit(record)}
+                              disabled={!canEditRecord(record)} onClick={() => handleEdit(record)}
                               className="group px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 hover:shadow-md"
                               title="Registrar devolução"
                             >
@@ -410,7 +417,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                             </button>
                           ) : (
                             <button
-                              onClick={() => handleEdit(record)}
+                              disabled={!canEditRecord(record)} onClick={() => handleEdit(record)}
                               className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                               title="Editar"
                             >
@@ -418,7 +425,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                             </button>
                           )}
                           <button
-                            onClick={() => setDeleteConfirm(record.id)}
+                            disabled={!canDelete} onClick={() => setDeleteConfirm(record.id)}
                             className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                             title="Excluir"
                           >
@@ -496,6 +503,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                       setSelectedRecord(record);
                       setIsDetailsOpen(true);
                     }}
+                    aria-label="Ver detalhes"
                     className="flex flex-col items-center gap-1.5 px-3 py-3 bg-blue-50 text-blue-600 rounded-xl font-semibold text-xs hover:bg-blue-100 transition-colors col-span-2 sm:col-span-1"
                   >
                     <Eye className="w-5 h-5" />
@@ -503,15 +511,15 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                   </button>
                   {record.status === 'Em uso' ? (
                     <button
-                      onClick={() => handleEdit(record)}
+                      disabled={!canEditRecord(record)} onClick={() => handleEdit(record)}
                       className="flex flex-col items-center gap-1.5 px-3 py-3 bg-purple-600 text-white rounded-xl font-semibold text-xs hover:bg-purple-700 transition-colors"
                     >
                       <LogIn className="w-5 h-5" />
-                      Devol.
+                      <span aria-label="Registrar devolução">Devol.</span>
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleEdit(record)}
+                      disabled={!canEditRecord(record)} onClick={() => handleEdit(record)}
                       className="flex flex-col items-center gap-1.5 px-3 py-3 bg-green-50 text-green-600 rounded-xl font-semibold text-xs hover:bg-green-100 transition-colors"
                     >
                       <Edit2 className="w-5 h-5" />
@@ -519,7 +527,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                     </button>
                   )}
                   <button
-                    onClick={() => setDeleteConfirm(record.id)}
+                    disabled={!canDelete} onClick={() => setDeleteConfirm(record.id)}
                     className="flex flex-col items-center gap-1.5 px-3 py-3 bg-red-50 text-red-600 rounded-xl font-semibold text-xs hover:bg-red-100 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -642,7 +650,7 @@ export function DatabaseView({ onSuccess, onError, refreshTrigger }: DatabaseVie
                       <p className="text-sm text-gray-600">📋 {vehicle.responsible_name}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-2">
-                      Cadastrado em {formatDateBR(vehicle.created_at)} às {new Date(vehicle.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      Cadastrado em {formatDateBR(vehicle.created_at)} às {vehicle.created_at ? new Date(vehicle.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </p>
                   </div>
                 </div>

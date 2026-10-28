@@ -1,3 +1,5 @@
+import { reportError } from '../utils/diagnostics';
+import { safeSignatureSource } from '../utils/signature';
 import { useState, useEffect, useMemo } from 'react';
 import { Truck, LogOut, LogIn, FileText, Save, RotateCcw, Search } from 'lucide-react';
 import { Input } from './Input';
@@ -63,7 +65,7 @@ export function VehicleForm({ onSuccess, onError, editData }: VehicleFormProps) 
         setVehicles(activeVehicles);
         setUnavailableVehiclePlates(new Set(unavailablePlates));
       } catch (error) {
-        console.error('Erro ao carregar veiculos:', error);
+        reportError('Erro ao carregar veiculos:', error);
         setVehicles([]);
       } finally {
         setLoadingVehicles(false);
@@ -192,19 +194,6 @@ export function VehicleForm({ onSuccess, onError, editData }: VehicleFormProps) 
             : 'Em uso';
 
       const usageType = formData.usage_type || 'Comum';
-      const nextVehiclePlate = formData.vehicle_plate.trim().toUpperCase();
-      const previousVehiclePlate = editData?.vehicle_plate?.trim().toUpperCase() || '';
-
-      const syncVehiclePatioStatus = async (vehiclePlate: string, inPatio: boolean) => {
-        const targetVehicle = vehicles.find((vehicle) => vehicle.plate.trim().toUpperCase() === vehiclePlate);
-
-        if (!targetVehicle || targetVehicle.in_patio === inPatio) {
-          return;
-        }
-
-        await vehicleCatalogService.updatePatioStatus(targetVehicle.id, inPatio);
-      };
-
       if (editData?.id) {
         const updatePayload: Partial<VehicleRecordInput> = isReturnMode
           ? {
@@ -251,11 +240,6 @@ export function VehicleForm({ onSuccess, onError, editData }: VehicleFormProps) 
         await vehicleService.createRecord(createPayload);
       }
 
-      if (previousVehiclePlate && previousVehiclePlate !== nextVehiclePlate) {
-        await syncVehiclePatioStatus(previousVehiclePlate, true);
-      }
-
-      await syncVehiclePatioStatus(nextVehiclePlate, status !== 'Em uso');
 
       onSuccess();
 
@@ -263,7 +247,7 @@ export function VehicleForm({ onSuccess, onError, editData }: VehicleFormProps) 
         handleClear();
       }
     } catch (error) {
-      console.error('Error saving record:', error);
+      reportError('Error saving record:', error);
       onError('Erro ao salvar registro. Tente novamente.');
     } finally {
       setIsSubmitting(false);
@@ -541,7 +525,7 @@ export function VehicleForm({ onSuccess, onError, editData }: VehicleFormProps) 
             <label className="block text-sm font-semibold text-gray-700">Assinatura</label>
             <div className="rounded-xl border border-gray-200 bg-white p-3">
               <img
-                src={formData.pickup_signature}
+                src={safeSignatureSource(formData.pickup_signature)}
                 alt="Assinatura de retirada"
                 className="w-full max-h-32 sm:max-h-40 object-contain"
               />

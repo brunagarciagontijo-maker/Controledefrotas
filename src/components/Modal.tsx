@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -11,14 +11,32 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const titleId = useId();
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const timer = window.setTimeout(() => dialogRef.current?.focus(), 0);
+    const keydown = (event: KeyboardEvent) => {
+      const dialogs = document.querySelectorAll('[aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
+      if (event.key !== 'Tab') return;
+      const elements = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]') || []).filter(element => element.getClientRects().length);
+      const first = elements[0], last = elements[elements.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
     return () => {
-      document.body.style.overflow = 'unset';
+      window.clearTimeout(timer);
+      document.removeEventListener('keydown', keydown);
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus();
     };
   }, [isOpen]);
 
@@ -42,13 +60,15 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalPr
         
         {/* Modal Content */}
         <div
+          ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
           className={`relative glass rounded-2xl sm:rounded-3xl shadow-premium-lg w-full ${sizeClasses[size]} max-h-[92dvh] sm:max-h-[92vh] overflow-hidden animate-scale-in`}
         >
           {/* Header */}
           <div className="sticky top-0 bg-white border-b px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between z-10">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+            <h2 id={titleId} className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
             <button
               onClick={onClose}
+              aria-label={`Fechar ${title}`}
               className="group relative p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all duration-200"
             >
               <X className="w-6 h-6" />

@@ -1,0 +1,91 @@
+{
+  "sourceCommit": "98e8df0325256349fbb6753ca004a26c27632185",
+  "note": "Migrations historicas preservadas; este manifesto nao indica aplicacao remota.",
+  "files": [
+    {
+      "name": "20260304132509_create_vehicle_records.sql",
+      "sha256": "d0102aa23d5376ec45bf3d56b83bb354b7172a0ae8608ef5d7a3d047d2bd382c"
+    },
+    {
+      "name": "20260305111000_create_vehicles_table.sql",
+      "sha256": "9d918583392bc606e81c080fb871f77392fd722e12e70a04099ed8ea3f41eff4"
+    },
+    {
+      "name": "20260601120000_create_operational_tables.sql",
+      "sha256": "25f73df13ba9c3868c48fdc61f643d6dcfebea80770e1c7a0ea38d12739c3104"
+    },
+    {
+      "name": "20260601153000_update_drivers_for_history.sql",
+      "sha256": "33daffe61248f92a618315b2acb6ccd53a9c859569dc64f8f2c6059f41dffbf8"
+    },
+    {
+      "name": "20260601160000_seed_driver_names.sql",
+      "sha256": "573609c980aff3c282e13cf3e88da8723a5c0af484d7e9dcfa30f70989791f0e"
+    },
+    {
+      "name": "20260601172000_add_short_codes.sql",
+      "sha256": "110c9b3392c85b66e826326db652decaca234f8d6d1bc8da0262f675adc8d9e2"
+    },
+    {
+      "name": "20260601174000_add_vehicle_patio_status.sql",
+      "sha256": "ff1c21b75d2fcb37e054f7177026ac54d4a4974e0db5e14187391a4dee23ce1b"
+    },
+    {
+      "name": "20260601175000_allow_null_driver_cnh_on_movements.sql",
+      "sha256": "c18a118b87432805c18f133106283031473f3cc48dd6c55f0e7d6fb18d605d4d"
+    },
+    {
+      "name": "20260601182000_create_operational_checklist_items.sql",
+      "sha256": "0ce1fa02ad95f87b7ff61cba6accdf083ee4376567ca7f5dd00787154a226d09"
+    },
+    {
+      "name": "20260601183000_remove_fuel_from_checklist_items.sql",
+      "sha256": "c51398bb7572a29780f61e61cf4a82f45cb0dab9c72d11d03dc8eb7c75762022"
+    },
+    {
+      "name": "20260601184000_remove_unneeded_checklist_items.sql",
+      "sha256": "9bad0a8d2a4bcde89716f74c464e902418eeb18c92c453ca0379c8fcd5c4e7d9"
+    },
+    {
+      "name": "20260605130000_add_vehicle_usage_type.sql",
+      "sha256": "5f66776821e1c1c678edd14799ca8a4496b1f60e591cb4695e0579d34772d1a4"
+    },
+    {
+      "name": "20260608100000_add_vehicle_record_usage_type.sql",
+      "sha256": "82f8ffc4993bbda6b8e0f3ee650135310f4a78c36ec7dc16b5838c14f3cc2e01"
+    },
+    {
+      "name": "20260609120000_add_driver_cnh_documents.sql",
+      "sha256": "d8b831954c765ace75dcd4809a5256115d0b0f24f0abc1ed6100f5ca1cbb4dcc"
+    },
+    {
+      "name": "20260609143000_shorten_vehicle_codes.sql",
+      "sha256": "8a6ff9a3c14bcec1a7117eea9535c8bd8192df1973ee8ac80307d3fb934bb7e7"
+    },
+    {
+      "name": "20260609170000_add_vehicle_fixed_driver.sql",
+      "sha256": "d441e91e95c421d5c14d734a53384b91bfa1b2cd3c7f0198873104fbc9a8d99c"
+    },
+    {
+      "name": "20260702100000_create_people_access_control.sql",
+      "sha256": "abee5599266d5660ed1c6680b17874ebff18ca5487da67f116a435d612434117"
+    },
+    {
+      "name": "20260702103000_seed_personal_vehicles.sql",
+      "sha256": "85af75c073f81b1a43859c2f7bbbcfe2265bbc1be4e095b6d2c77848b65c796d"
+    },
+    {
+      "name": "20260702104000_restore_personal_vehicle_name_accents.sql",
+      "sha256": "18532b93b8b1ff8b8d49f85f4d586dd31404ba4b382834478f14c351c9a5a0a5"
+    },
+    {
+      "name": "20260720130000_add_people_driver_role.sql",
+      "sha256": "4256666ed94f4f27952a3503266bf8a4aac8603fb61225a2f528d66b7f38e0d2"
+    },
+    {
+      "name": "20260908120000_create_vehicle_inspection_requests.sql",
+      "sha256": "5420d97e9ae646e4a8c4da250e1d50bcce485aebdff47725a532d088693ffb87"
+    }
+  ],
+  "normalization": "UTF-8, LF"
+}

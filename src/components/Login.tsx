@@ -1,157 +1,42 @@
-import { useState } from 'react';
-import { Eye, EyeOff, LogIn, Lock, User } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Eye, EyeOff, LogIn, Lock } from 'lucide-react';
+import { useAuth } from '../auth/context';
+import { requireDevEnvironment } from '../lib/runtime';
+export type { UserRole } from '../auth/authorization';
 
-export type UserRole = 'admin' | 'porteiro';
-
-interface LoginProps {
-  onLogin: (role: UserRole) => void;
-}
-
-const USERS: { username: string; password: string; role: UserRole }[] = [
-  { username: 'admingontijo', password: 'admin123', role: 'admin' },
-  { username: 'gabriela', password: 'q9uJz!y$#!dHUH', role: 'admin' },
-  { username: 'Marlon.nocci@gontijoengenharia.com.br', password: 'Marlon@2026', role: 'admin' },
-  { username: 'bruna.garcia@gontijoengenharia.com.br', password: '12345678', role: 'admin' },
-  { username: 'controle.acesso@gontijoengenharia.com.br', password: 'Acesso@2026', role: 'admin' },
-  { username: 'lorena', password: 'lorena', role: 'porteiro' },
-];
-
-export function Login({ onLogin }: LoginProps) {
-  const [username, setUsername] = useState('');
+export function Login() {
+  const original=requireDevEnvironment().mode==='original';
+  const { signIn } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    // Simular delay de autenticação
-    setTimeout(() => {
-      const match = USERS.find((u) => u.username === username && u.password === password);
-      if (match) {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userRole', match.role);
-        localStorage.setItem('username', match.username);
-        onLogin(match.role);
-      } else {
-        setError('Usuário ou senha incorretos');
-        setIsLoading(false);
-      }
-    }, 800);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError('');
+    try { await signIn(email, password); setPassword(''); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'Nao foi possivel entrar.'); }
+    finally { setBusy(false); }
   };
-
-  return (
-    <div className="min-h-screen gradient-mesh flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo e Header */}
-        <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-block relative mb-6">
-            <img 
-              src="/gontijofundacoes_logo.jpg" 
-              alt="Logo Gontijo" 
-              className="w-32 h-32 mx-auto object-contain drop-shadow-2xl" 
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Controle de Veículos
-          </h1>
-          <p className="text-gray-600">
-            Faça login para acessar o sistema
-          </p>
-        </div>
-
-        {/* Form Card */}
-        <div className="glass rounded-2xl p-8 shadow-2xl animate-scale-in">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Campo Usuário */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Usuário
-              </label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                  <User className="w-5 h-5" />
-                </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white transition-all outline-none text-gray-900"
-                  placeholder="Digite seu usuário"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Campo Senha */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Senha
-              </label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3 bg-white/50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white transition-all outline-none text-gray-900"
-                  placeholder="Digite sua senha"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Mensagem de Erro */}
-            {error && (
-              <div className="bg-red-50 border-2 border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm animate-bounce-in">
-                {error}
-              </div>
-            )}
-
-            {/* Botão de Login */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full gradient-primary text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Entrando...
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  Entrar
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Info de Credenciais (remover em produção) */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Sistema de autenticação local
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <main className="min-h-screen gradient-mesh flex items-center justify-center p-4">
+    <section className="glass w-full max-w-md rounded-3xl p-7 shadow-premium-lg animate-scale-in sm:p-10">
+      <p className="mb-3 text-xs font-bold text-red-700">{original?'ORIGINAL · DADOS EXISTENTES':'DEV · SOMENTE DADOS FICTÍCIOS'}</p>
+      <img src="/gontijofundacoes_logo.jpg" alt="Gontijo" className="mx-auto mb-4 h-20 w-20 object-contain" />
+      <h1 className="text-2xl font-bold text-gray-900">Sistema Portaria</h1>
+      <p className="mt-2 mb-6 text-sm text-gray-600">Entre com sua conta autorizada do projeto conferido.</p>
+      <form onSubmit={submit} className="space-y-4">
+        <label className="block text-sm font-medium text-gray-800">Email
+          <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-xl border-2 border-gray-200 p-3" />
+        </label>
+        <label className="block text-sm font-medium text-gray-800">Senha
+          <span className="relative mt-1 block"><input type={visible ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full rounded-xl border-2 border-gray-200 p-3 pr-12" />
+            <button type="button" aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setVisible(!visible)} className="absolute right-3 top-3">{visible ? <EyeOff /> : <Eye />}</button>
+          </span>
+        </label>
+        {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+        <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 p-3 font-bold text-white disabled:opacity-50"><LogIn className="h-5 w-5" />{busy ? 'Entrando...' : 'Entrar'}</button>
+      </form>
+      <p className="mt-5 flex items-center gap-2 text-xs text-gray-500"><Lock className="h-4 w-4" />Acesso e perfil verificados pelo Supabase Auth.</p>
+    </section>
+  </main>;
 }
