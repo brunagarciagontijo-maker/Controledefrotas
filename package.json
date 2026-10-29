@@ -7,8 +7,8 @@
     "dev": "vite --mode demo",
     "dev:cloud": "vite --mode devcloud",
     "dev:configure": "node --experimental-strip-types scripts/configure-dev.ts",
-    "build": "npm run typecheck && vite build --mode devcloud",
-    "build:dev": "npm run build",
+    "build": "npm run typecheck && vite build --mode original",
+    "build:dev": "npm run typecheck && vite build --mode devcloud",
     "lint": "eslint .",
     "preview": "vite preview --mode devcloud",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.tools.json",
@@ -30,8 +30,8 @@
     "backup:verify": "node scripts/verify-backup.mjs",
     "original:authorize-write": "node --experimental-strip-types scripts/authorize-original-write.ts",
     "original:lock": "node --experimental-strip-types scripts/lock-original.ts",
-    "build:original": "npm run typecheck && vite build --mode original",
-    "build:netlify": "npm run typecheck && vite build --mode original"
+    "build:original": "npm run build",
+    "build:netlify": "npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",

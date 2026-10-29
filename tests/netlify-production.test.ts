@@ -12,7 +12,7 @@ const key = 'sb_publishable_fictitious_key_for_isolated_netlify_tests';
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const hash = async (text: string) => text === ref ? BLOCKED_PROJECT_HASHES[0] : sha(text);
 const contract: NetlifyProductionContract = {
-  version: 1, branch: 'main', origin: 'https://controledefrotasgontijo.netlify.app', siteName: 'controledefrotasgontijo',
+  version: 1, branch: 'main', origin: 'https://controledeportariagontijo.netlify.app', siteName: 'controledeportariagontijo',
   repository: 'brunagarciagontijo-maker/Controledefrotas', projectRefSha256: BLOCKED_PROJECT_HASHES[0], publicKeySha256: sha(key),
   release: { inventorySha256: '1'.repeat(64), sqlBundleSha256: '2'.repeat(64), schemaVersion: 5,
     recoveryStrategy: 'no-backup-risk-accepted', recoveryWaiverSha256: '3'.repeat(64) }, templateFiles: originalSourceHashes(),
@@ -57,6 +57,30 @@ test('CI rejects wrong Supabase, wrong key, local origin, old release and change
 test('CI refuses concatenated keys even if their fingerprint was configured', async () => {
   const jwt = 'eyJ' + 'a'.repeat(12) + '.eyJ' + 'b'.repeat(12) + '.' + 'c'.repeat(43) + 'sb_publishable_fictitious';
   await assert.rejects(() => createNetlifyProductionTarget(env, { ...input, VITE_SUPABASE_ANON_KEY: jwt }, { ...contract, publicKeySha256: sha(jwt) }, hash));
+});
+
+test('CI rejects the old domain in platform context, client origin and a substituted contract', async () => {
+  const oldOrigin = 'https://controledefrotasgontijo.netlify.app';
+  const oldSite = 'controledefrotasgontijo';
+  await assert.rejects(() => createNetlifyProductionTarget({ ...env, URL: oldOrigin, SITE_NAME: oldSite }, input, contract, hash));
+  await assert.rejects(() => createNetlifyProductionTarget(env, { ...input, VITE_PUBLIC_APP_URL: oldOrigin }, contract, hash));
+  await assert.rejects(() => createNetlifyProductionTarget({ ...env, URL: oldOrigin, SITE_NAME: oldSite },
+    { ...input, VITE_PUBLIC_APP_URL: oldOrigin }, { ...contract, origin: oldOrigin, siteName: oldSite }, hash));
+});
+
+test('npm run build and Netlify use original production mode; devcloud stays explicit', () => {
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+  assert.equal(pkg.scripts.build, 'npm run typecheck && vite build --mode original');
+  assert.equal(pkg.scripts['build:dev'], 'npm run typecheck && vite build --mode devcloud');
+  assert.equal(pkg.scripts['build:netlify'], 'npm run build');
+  const config = readFileSync('netlify.toml', 'utf8');
+  assert.ok(config.includes('command = "npm run build"'));
+  assert.ok(config.includes('publish = "dist"'));
+  const published = JSON.parse(readFileSync('netlify/production-contract.json', 'utf8'));
+  assert.equal(published.origin, contract.origin);
+  assert.equal(published.siteName, contract.siteName);
+  assert.equal(published.branch, 'main');
+  assert.equal(published.release.schemaVersion, 5);
 });
 
 test('ignore command skips development and previews; main proceeds to the strict guard', () => {

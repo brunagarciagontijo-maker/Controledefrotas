@@ -1,17 +1,19 @@
 # Publicação automática no site existente
 
-Destino: https://controledefrotasgontijo.netlify.app/
+Destino: https://controledeportariagontijo.netlify.app/
 Repositório: https://github.com/brunagarciagontijo-maker/Controledefrotas
 
 ## Estado e limites desta preparação
 
 Configuração preparada localmente. Nenhum commit, push, merge, alteração no painel Netlify ou deploy foi executado nesta etapa. Supabase, Auth, RLS, Storage e os SQLs 001–007 não foram alterados.
 
+Adaptação para o novo site validada localmente: lint, TypeScript, 233 testes automatizados e `npm run build` com contexto production/main simulado passaram. O artefato iniciou na origem nova em desktop/celular, com API interceptada, e recusou a origem antiga antes de consultar o marcador. Nenhuma sessão Auth real ou conexão remota foi utilizada. O build permanece em `dist`, ignorado pelo Git; o painel Netlify ainda exige conferência externa.
+
 `main` será a branch de produção; `desenvolvimento` permanece separada. A consulta remota confirmou `main` e ainda não encontrou `desenvolvimento`. Não trocar branches nem sobrescrever o trabalho local para preparar o primeiro commit.
 
 ## Guardas do build
 
-- `netlify.toml`: comando `npm run build:netlify`, Node 24, saída `dist`, reescrita SPA e origem HTTPS fixa no contexto production.
+- `netlify.toml`: comando `npm run build`, Node 24, saída `dist`, reescrita SPA e origem HTTPS fixa no contexto production. `build:original` e `build:netlify` são aliases; `build:dev` continua usando explicitamente devcloud.
 - `scripts/netlify-ignore.mjs`: cancela builds de desenvolvimento, branch deploys e previews. Apenas production/main prossegue.
 - `scripts/netlify-production.ts`: exige NETLIFY=true, CONTEXT=production, BRANCH=main, PULL_REQUEST=false, SITE_NAME/URL do site existente e REPOSITORY_URL do repositório transferido. O build recusa preview servers, outro site/repositório e contextos incompletos.
 - Projeto Supabase original e chave pública são conferidos por SHA-256; contrato 5 e os sete templates SQL permanecem pinados. Chaves concatenadas ou administrativas são recusadas. Nenhuma migration é executada pelo build.
@@ -29,7 +31,7 @@ No **site Netlify existente**, conferir acesso da integração GitHub ao novo re
 4. Configurar no contexto **Production**, com escopo de build:
    - `VITE_SUPABASE_URL`: URL HTTPS exata do projeto original aprovado.
    - `VITE_SUPABASE_ANON_KEY`: somente a chave pública anon aprovada completa, sem concatenação.
-   - `VITE_PUBLIC_APP_URL`: https://controledefrotasgontijo.netlify.app (já fixada em netlify.toml).
+   - `VITE_PUBLIC_APP_URL`: https://controledeportariagontijo.netlify.app (já fixada em netlify.toml).
 5. Não adicionar service_role, senha PostgreSQL, tokens de administração ou outras variáveis VITE_. Nenhum token Netlify precisa ser incluído no repositório ou usado pelo frontend.
 6. Não redefinir as variáveis de plataforma NETLIFY, CONTEXT, BRANCH, PULL_REQUEST, SITE_NAME, URL e REPOSITORY_URL. O build verifica os valores fornecidos pela plataforma.
 

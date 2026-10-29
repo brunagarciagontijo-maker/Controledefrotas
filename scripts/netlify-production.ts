@@ -50,7 +50,7 @@ export async function createNetlifyProductionTarget(
   const fields = ['version', 'branch', 'origin', 'siteName', 'repository', 'projectRefSha256', 'publicKeySha256', 'release', 'templateFiles'];
   if (!contract || typeof contract !== 'object' || Object.keys(contract).length !== fields.length ||
     Object.keys(contract).some(key => !fields.includes(key)) || contract.version !== 1 || contract.branch !== 'main' ||
-    contract.origin !== 'https://controledefrotasgontijo.netlify.app' || contract.siteName !== 'controledefrotasgontijo' ||
+    contract.origin !== 'https://controledeportariagontijo.netlify.app' || contract.siteName !== 'controledeportariagontijo' ||
     contract.repository !== 'brunagarciagontijo-maker/Controledefrotas' || !isNetlifyProductionContext(env, contract) ||
     !/^[a-f0-9]{64}$/.test(contract.publicKeySha256) || !BLOCKED_PROJECT_HASHES.includes(contract.projectRefSha256) ||
     !approvedOriginalRelease(contract.release) || !currentOriginalSources(contract.templateFiles)) return fail();

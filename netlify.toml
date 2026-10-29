@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build:netlify"
+  command = "npm run build"
   publish = "dist"
   ignore = "node scripts/netlify-ignore.mjs"
 
@@ -7,7 +7,7 @@
   NODE_VERSION = "24"
 
 [context.production.environment]
-  VITE_PUBLIC_APP_URL = "https://controledefrotasgontijo.netlify.app"
+  VITE_PUBLIC_APP_URL = "https://controledeportariagontijo.netlify.app"
 
 [[redirects]]
   from = "/*"

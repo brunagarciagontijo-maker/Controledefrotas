@@ -66,6 +66,6 @@ export default defineConfig(async ({ mode,command }) => {
     },
     server: { host: serverHost, port: serverPort, strictPort: true, headers: { 'Content-Security-Policy': policy } },
     preview: { host: serverHost, port: serverPort, strictPort: true, headers: { 'Content-Security-Policy': policy } },
-    build: { sourcemap: false },
+    build: { sourcemap: false, emptyOutDir: true },
   };
 });

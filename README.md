@@ -34,6 +34,6 @@ Os testes SQL usam PostgreSQL WASM em memória. O navegador usa Chrome/Edge já 
 
 `original:configure` fixa o destino local inicialmente em metadata-only. A liberação original exige evidências/dispensa registrada, SQL aprovado/aplicado, validação e autorização do aplicativo. Nenhum script de build aplica migrations.
 
-[Configuração de deploy automático Netlify](NETLIFY_AUTODEPLOY.md): site existente `controledefrotasgontijo.netlify.app`, produção somente em `main`; `desenvolvimento` e previews não publicam o projeto original. O CI exige variáveis explícitas e o contrato público pinado, sem arquivos privados locais. A configuração externa e a publicação ainda precisam de conferência/autorização.
+[Configuração de deploy automático Netlify](NETLIFY_AUTODEPLOY.md): site existente `controledeportariagontijo.netlify.app`, produção somente em `main`; `desenvolvimento` e previews não publicam o projeto original. O CI exige variáveis explícitas e o contrato público pinado, sem arquivos privados locais. A configuração externa e a publicação ainda precisam de conferência/autorização.
 
 `DEV_SETUP.md`, `supabase/dev` e as 21 migrations históricas são referências anteriores. **Não execute esses pacotes nem `supabase/database.sql` no projeto original.**
