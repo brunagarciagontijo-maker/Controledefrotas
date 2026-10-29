@@ -1,4 +1,8 @@
+import { signedFileUrl, validateUpload } from '../lib/privateFiles';
 import { supabase } from '../lib/supabase';
+import { isDemo } from '../demo/mode';
+import { demoStore } from '../domain/demoStore';
+import { requireDevEnvironment } from '../lib/runtime';
 import type {
   DriverInput,
   DriverRecord,
@@ -10,15 +14,6 @@ import type {
 
 const PHOTO_BUCKET = 'vehicle-operation-photos';
 const DRIVER_CNH_BUCKET = 'person-documents';
-
-const CHECKLIST_LABELS: Record<string, string> = {
-  pneus: 'Pneus e estepe',
-  luzes: 'Luzes e sinalização',
-  vidros: 'Vidros e espelhos',
-  limpeza: 'Limpeza geral',
-  odometro: 'Odômetro conferido',
-  avarias: 'Sem avarias aparentes',
-};
 
 export interface MovementInput {
   vehicle_id: string;
@@ -50,83 +45,23 @@ export interface MovementCloseInput {
   checklist: Json;
 }
 
-async function uploadPhotos(
-  movementId: string,
-  phase: 'Entrada' | 'Saida',
-  files: File[]
-): Promise<Array<{ movement_id: string; phase: 'Entrada' | 'Saida'; file_path: string; file_url: string; caption: string }>> {
-  if (files.length === 0) {
-    return [];
-  }
-
-  const uploaded = await Promise.all(
-    files.map(async (file, index) => {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = `${movementId}/${phase.toLowerCase()}/${Date.now()}-${index}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from(PHOTO_BUCKET)
-        .upload(filePath, file, {
-          contentType: file.type || 'image/jpeg',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(filePath);
-
-      return {
-        movement_id: movementId,
-        phase,
-        file_path: filePath,
-        file_url: data.publicUrl,
-        caption: file.name,
-      };
-    })
-  );
-
-  return uploaded;
-}
-
-function getChecklistPhaseGroup(checklist: Json, sourceKey: 'entry' | 'exit') {
-  if (!checklist || typeof checklist !== 'object' || Array.isArray(checklist)) {
-    return {};
-  }
-
-  const phaseGroup = (checklist as Record<string, Json | undefined>)[sourceKey];
-  if (!phaseGroup || typeof phaseGroup !== 'object' || Array.isArray(phaseGroup)) {
-    return {};
-  }
-
-  return phaseGroup as Record<string, { ok?: unknown; note?: unknown } | undefined>;
-}
-
-async function upsertChecklistItems(
-  movementId: string,
-  phase: 'Entrada' | 'Saida',
-  checklist: Json,
-  sourceKey: 'entry' | 'exit'
-) {
-  const group = getChecklistPhaseGroup(checklist, sourceKey);
-  const rows = Object.entries(CHECKLIST_LABELS).map(([itemKey, itemLabel]) => {
-    const item = group[itemKey];
-    return {
-      movement_id: movementId,
-      phase,
-      item_key: itemKey,
-      item_label: itemLabel,
-      is_ok: !!item?.ok,
-      note: typeof item?.note === 'string' ? item.note : '',
-    };
-  });
-
-  const { error } = await supabase
-    .from('operational_checklist_items')
-    .upsert(rows as never, { onConflict: 'movement_id,phase,item_key' });
-
-  if (error) {
-    throw error;
+async function uploadPhotos(movementId: string, phase: 'Entrada' | 'Saida', files: File[]) {
+  const rows: Array<{ movement_id: string; phase: 'Entrada' | 'Saida'; file_path: string; file_url: string; caption: string }> = [];
+  try {
+    for (const [index, file] of files.entries()) {
+      validateUpload(file, 'photo');
+      const name = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = movementId + '/' + phase.toLowerCase() + '/' + Date.now() + '-' + index + '-' + name;
+      const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(filePath, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      rows.push({ movement_id: movementId, phase, file_path: filePath, file_url: '', caption: file.name });
+    }
+    const { error } = rows.length ? await supabase.from('operational_photos').insert(rows) : { error: null };
+    if (error) throw error;
+    return rows;
+  } catch {
+    if (rows.length) await supabase.storage.from(PHOTO_BUCKET).remove(rows.map(row => row.file_path));
+    throw new Error('Movimentacao salva. As fotos nao foram concluidas; confira o registro antes de tentar novamente.');
   }
 }
 
@@ -145,6 +80,7 @@ function normalizeName(value: string) {
 
 export const operationalService = {
   async listDrivers(): Promise<DriverRecord[]> {
+    if(isDemo())return demoStore.snapshot().people.filter(row=>row.is_driver);
     const { data, error } = await supabase
       .from('people')
       .select('*')
@@ -159,6 +95,7 @@ export const operationalService = {
   },
 
   async createDriver(input: DriverInput): Promise<DriverRecord> {
+    if(isDemo())return demoStore.createPerson({...input,person_type:input.person_type||'Funcionario',is_driver:true});
     const payload = {
       ...input,
       person_type: input.person_type || 'Funcionario',
@@ -174,7 +111,7 @@ export const operationalService = {
       notes: input.notes?.trim() || '',
     };
 
-    const { data, error } = await supabase.from('people').insert(payload as never).select().single();
+    const { data, error } = await supabase.from('people').insert(payload).select().single();
 
     if (error) {
       throw error;
@@ -184,6 +121,7 @@ export const operationalService = {
   },
 
   async updateDriver(id: string, input: Partial<DriverInput>): Promise<DriverRecord> {
+    if(isDemo())return demoStore.updatePerson(id,{...input,is_driver:true});
     const payload = {
       ...input,
       ...(input.person_type ? { person_type: input.person_type } : {}),
@@ -204,7 +142,7 @@ export const operationalService = {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase.from('people').update(payload as never).eq('id', id).select().single();
+    const { data, error } = await supabase.from('people').update(payload).eq('id', id).select().single();
 
     if (error) {
       throw error;
@@ -214,14 +152,7 @@ export const operationalService = {
   },
 
   async uploadDriverCnh(driver: DriverRecord, file: File): Promise<DriverRecord> {
-    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error('O anexo da CNH deve ter no máximo 10 MB');
-    }
-    if (file.type && !allowedTypes.has(file.type)) {
-      throw new Error('Formato de anexo da CNH não permitido');
-    }
-
+    validateUpload(file, 'document');
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `${driver.id}/${Date.now()}-${safeName}`;
     const { error: uploadError } = await supabase.storage
@@ -235,32 +166,31 @@ export const operationalService = {
       throw uploadError;
     }
 
-    const { data: publicUrlData } = supabase.storage.from(DRIVER_CNH_BUCKET).getPublicUrl(filePath);
-
     try {
-      const { data: signed } = await supabase.storage.from(DRIVER_CNH_BUCKET).createSignedUrl(filePath, 60 * 60);
       const updatedDriver = await this.updateDriver(driver.id, {
         cnh_file_path: filePath,
-        cnh_file_url: signed?.signedUrl || publicUrlData.publicUrl,
+        cnh_file_url: null,
         cnh_file_name: file.name,
         cnh_file_type: file.type || null,
       });
 
-      if (driver.cnh_file_path) {
+      if (driver.cnh_file_path && requireDevEnvironment().mode !== 'original') {
         await supabase.storage.from(DRIVER_CNH_BUCKET).remove([driver.cnh_file_path]);
       }
 
       return updatedDriver;
     } catch (error) {
-      await supabase.storage.from(DRIVER_CNH_BUCKET).remove([filePath]);
+      // Nao apagar evidencias no original quando o resultado da atualizacao for incerto.
+      if(requireDevEnvironment().mode !== 'original')await supabase.storage.from(DRIVER_CNH_BUCKET).remove([filePath]);
       throw error;
     }
   },
 
   async deleteDriver(id: string): Promise<void> {
+    if(isDemo()){demoStore.updatePerson(id,{is_active:false});return;}
     const { error } = await supabase
       .from('people')
-      .update({ is_active: false, updated_at: new Date().toISOString() } as never)
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
@@ -269,18 +199,30 @@ export const operationalService = {
   },
 
   async getDriverCnhUrl(driver: DriverRecord): Promise<string | null> {
-    if (!driver.cnh_file_path) {
-      return driver.cnh_file_url || null;
+    if(isDemo()){const file=demoStore.documents.get(driver.cnh_file_path||'');return file?URL.createObjectURL(file):null;}
+    if(!driver.cnh_file_path)return null;
+    if(requireDevEnvironment().mode==='original'){
+      const {data:bucket,error}=await supabase.rpc('portaria_document_bucket',{file_path:driver.cnh_file_path});
+      if(error||!bucket)throw new Error('Documento privado ausente ou ambiguo. Revise o Storage.');
+      return signedFileUrl(bucket,driver.cnh_file_path);
     }
+    return signedFileUrl(DRIVER_CNH_BUCKET,driver.cnh_file_path);
+  },
 
-    const { data, error } = await supabase.storage.from(DRIVER_CNH_BUCKET).createSignedUrl(driver.cnh_file_path, 60 * 10);
-    if (error) {
-      return driver.cnh_file_url || null;
-    }
-    return data.signedUrl;
+  async listPhotos(movementId: string) {
+    if(isDemo())return [...(demoStore.photoFiles.get(movementId)||[]).map(photo=>({id:photo.item,movement_id:movementId,phase:'Saida' as const,file_path:'memoria/'+photo.item,file_url:URL.createObjectURL(photo.file),caption:photo.item,created_by:null,created_at:null})),...(demoStore.returnPhotoFiles.get(movementId)||[]).map((file,index)=>({id:'retorno-'+index,movement_id:movementId,phase:'Entrada' as const,file_path:'memoria/retorno/'+index,file_url:URL.createObjectURL(file),caption:'Foto de retorno '+(index+1),created_by:null,created_at:null}))];
+    const { data, error } = await supabase.from('operational_photos').select('*').eq('movement_id', movementId).order('created_at');
+    if (error) throw error;
+    const old=await Promise.all((data || []).map(async photo => ({ ...photo, file_url: await signedFileUrl(PHOTO_BUCKET, photo.file_path) })));
+    if(requireDevEnvironment().mode!=='original')return old;
+    const {data:next,error:nextError}=await supabase.rpc('portaria_movement_evidence',{movement_id:movementId});
+    if(nextError)throw new Error('Evidencias privadas indisponiveis.');
+    const photos=(next||[]) as unknown as Array<{item:string;path:string}>;
+    return [...old,...await Promise.all(photos.map(async photo=>({id:photo.path,movement_id:movementId,phase:'Saida' as const,file_path:photo.path,file_url:await signedFileUrl('portaria-evidence',photo.path),caption:photo.item,created_by:null,created_at:''})))];
   },
 
   async listMovements(): Promise<OperationalMovement[]> {
+    if(isDemo())return demoStore.snapshot().movements;
     const { data, error } = await supabase.from('operational_movements').select('*').order('created_at', { ascending: false });
 
     if (error) {
@@ -290,48 +232,9 @@ export const operationalService = {
     return data || [];
   },
 
-  async createMovement(
-    input: MovementInput,
-    entryPhotos: File[] = []
-  ): Promise<OperationalMovement> {
-    const { data: movementData, error } = await supabase.from('operational_movements').insert({
-        ...input,
-        vehicle_plate: normalizeText(input.vehicle_plate),
-        driver_name: input.driver_name.trim(),
-        driver_cnh_number: input.driver_cnh_number?.trim() ? normalizeText(input.driver_cnh_number) : null,
-        driver_cnh_valid_until: input.driver_cnh_valid_until?.trim() || null,
-        qr_identifier: input.qr_identifier?.trim() || '',
-        entry_observations: input.entry_observations?.trim() || '',
-        status: 'Em aberto',
-      } as never).select().single();
-
-    if (error) {
-      throw error;
-    }
-
-    const { error: vehicleStatusError } = await supabase
-      .from('vehicles')
-      .update({ in_patio: false, updated_at: new Date().toISOString() } as never)
-      .eq('id', input.vehicle_id);
-
-    if (vehicleStatusError) {
-      throw vehicleStatusError;
-    }
-
-    const movement = movementData as unknown as OperationalMovement;
-
-    await upsertChecklistItems(movement.id, 'Saida', input.checklist, 'exit');
-
-    if (entryPhotos.length > 0) {
-      const photoRows = await uploadPhotos(movement.id, 'Saida', entryPhotos);
-      const { error: photoError } = await supabase.from('operational_photos').insert(photoRows as never);
-
-      if (photoError) {
-        throw photoError;
-      }
-    }
-
-    return movement;
+  async createMovement(_input: MovementInput, _photos: File[] = []): Promise<OperationalMovement> {
+    void _input; void _photos;
+    throw new Error('Use a Portaria para confirmar Cobli e evidencias antes da saida.');
   },
 
   async closeMovement(
@@ -339,6 +242,11 @@ export const operationalService = {
     input: MovementCloseInput,
     exitPhotos: File[] = []
   ): Promise<OperationalMovement> {
+    if(isDemo()){exitPhotos.forEach(file=>validateUpload(file,'photo'));const row=demoStore.close(id,input);if(exitPhotos.length)demoStore.returnPhotoFiles.set(id,exitPhotos);return row;}
+    const {data:current,error:readError}=await supabase.from('operational_movements').select('checklist').eq('id',id).single();
+    if(readError)throw readError;
+    if(!current.checklist||typeof current.checklist!=='object'||Array.isArray(current.checklist)||!input.checklist||typeof input.checklist!=='object'||Array.isArray(input.checklist))throw new Error('Checklist inconsistente. Revise o registro sem substituir dados anteriores.');
+    const checklist:Json={...current.checklist,entry:input.checklist.entry};
     const { data: movementData, error } = await supabase.from('operational_movements').update({
         ...(input.driver_id !== undefined ? { driver_id: input.driver_id } : {}),
         ...(input.driver_name !== undefined ? { driver_name: input.driver_name.trim() } : {}),
@@ -353,67 +261,29 @@ export const operationalService = {
         exit_odometer: input.exit_odometer,
         exit_fuel_level: input.exit_fuel_level,
         exit_observations: input.exit_observations?.trim() || '',
-        checklist: input.checklist,
+        checklist,
         status: 'Concluida',
         updated_at: new Date().toISOString(),
-      } as never).eq('id', id).select().single();
+      }).eq('id', id).select().single();
 
     if (error) {
       throw error;
     }
 
-    const movement = movementData as unknown as OperationalMovement;
+    const movement = movementData;
 
-    const { error: vehicleStatusError } = await supabase
-      .from('vehicles')
-      .update({ in_patio: true, updated_at: new Date().toISOString() } as never)
-      .eq('id', movement.vehicle_id);
 
-    if (vehicleStatusError) {
-      throw vehicleStatusError;
-    }
 
-    await upsertChecklistItems(movement.id, 'Entrada', input.checklist, 'entry');
-
-    if (exitPhotos.length > 0) {
-      const photoRows = await uploadPhotos(movement.id, 'Entrada', exitPhotos);
-      const { error: photoError } = await supabase.from('operational_photos').insert(photoRows as never);
-
-      if (photoError) {
-        throw photoError;
-      }
+if (exitPhotos.length > 0) {
+      await uploadPhotos(movement.id, 'Entrada', exitPhotos);
     }
 
     return movement;
   },
 
   async deleteMovement(id: string): Promise<void> {
-    const { data: movementData } = await supabase
-      .from('operational_movements')
-      .select('vehicle_id, status')
-      .eq('id', id)
-      .maybeSingle();
-
     const { error } = await supabase.from('operational_movements').delete().eq('id', id);
-
-    if (error) {
-      throw error;
-    }
-
-    // Movimento "Em aberto" tinha tirado o veículo do pátio. Apagar sem devolução
-    // deixaria in_patio travado em false, sumindo das retiradas. Restaura aqui.
-    const movement = movementData as unknown as Pick<OperationalMovement, 'vehicle_id' | 'status'> | null;
-
-    if (movement?.status === 'Em aberto' && movement.vehicle_id) {
-      const { error: patioError } = await supabase
-        .from('vehicles')
-        .update({ in_patio: true, updated_at: new Date().toISOString() } as never)
-        .eq('id', movement.vehicle_id);
-
-      if (patioError) {
-        throw patioError;
-      }
-    }
+    if (error) throw error;
   },
 
   normalizeName,

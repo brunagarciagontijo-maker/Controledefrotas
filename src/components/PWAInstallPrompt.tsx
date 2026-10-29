@@ -1,3 +1,4 @@
+import { reportError } from '../utils/diagnostics';
 import { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
 
@@ -12,6 +13,7 @@ export function PWAInstallPrompt() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    if (import.meta.env.MODE === 'devcloud') return;
     // Verificar se a app já está instalada
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
@@ -58,11 +60,11 @@ export function PWAInstallPrompt() {
         console.log('❌ Usuário rejeitou a instalação');
       }
     } catch (error) {
-      console.error('❌ Erro ao instalar:', error);
+      reportError('❌ Erro ao instalar:', error);
     }
   };
 
-  if (isInstalled || !showPrompt || !deferredPrompt) {
+  if (import.meta.env.MODE === 'devcloud' || isInstalled || !showPrompt || !deferredPrompt) {
     return null;
   }
 

@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { isDemo } from '../demo/mode';
+import { demoStore } from '../domain/demoStore';
 import type { FleetVehicle, FleetVehicleInput, VehicleStatus } from '../types/database';
 
 interface VehicleFilters {
@@ -9,6 +11,7 @@ interface VehicleFilters {
 
 export const vehicleCatalogService = {
   async listVehicles(filters?: VehicleFilters): Promise<FleetVehicle[]> {
+    if(isDemo())return demoStore.snapshot().vehicles.filter(row=>(!filters?.status||filters.status==='Todos'||row.status===filters.status)&&(typeof filters?.inPatio!=='boolean'||row.in_patio===filters.inPatio)&&(!filters?.search||[row.plate,row.name,row.responsible_name,row.fixed_driver_name,row.short_code].some(v=>v?.toLowerCase().includes(filters.search!.trim().toLowerCase()))));
     let query = supabase
       .from('vehicles')
       .select('*')
@@ -39,6 +42,7 @@ export const vehicleCatalogService = {
   },
 
   async createVehicle(input: FleetVehicleInput): Promise<FleetVehicle> {
+    if(isDemo())return demoStore.createVehicle(input);
     const payload: FleetVehicleInput = {
       ...input,
       plate: input.plate.trim().toUpperCase(),
@@ -48,7 +52,7 @@ export const vehicleCatalogService = {
 
     const { data, error } = await supabase
       .from('vehicles')
-      .insert(payload as never)
+      .insert(payload)
       .select()
       .single();
 
@@ -60,6 +64,7 @@ export const vehicleCatalogService = {
   },
 
   async updateVehicle(id: string, input: Partial<FleetVehicleInput>): Promise<FleetVehicle> {
+    if(isDemo())return demoStore.updateVehicle(id,input);
     const normalizedInput: Partial<FleetVehicleInput> = {
       ...input,
       ...(input.plate ? { plate: input.plate.trim().toUpperCase() } : {}),
@@ -69,7 +74,7 @@ export const vehicleCatalogService = {
 
     const { data, error } = await supabase
       .from('vehicles')
-      .update({ ...normalizedInput, updated_at: new Date().toISOString() } as never)
+      .update({ ...normalizedInput, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
@@ -82,9 +87,10 @@ export const vehicleCatalogService = {
   },
 
   async updatePatioStatus(id: string, inPatio: boolean): Promise<FleetVehicle> {
+    if(isDemo())return demoStore.updateVehicle(id,{in_patio:inPatio});
     const { data, error } = await supabase
       .from('vehicles')
-      .update({ in_patio: inPatio, updated_at: new Date().toISOString() } as never)
+      .update({ in_patio: inPatio, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
@@ -97,6 +103,7 @@ export const vehicleCatalogService = {
   },
 
   async deleteVehicle(id: string): Promise<void> {
+    if(isDemo()){if(demoStore.records.some(r=>r.vehicle_plate===demoStore.vehicles.find(v=>v.id===id)?.plate)||demoStore.movements.some(m=>m.vehicle_id===id))throw new Error('Veículo com histórico deve ser desativado.');demoStore.vehicles=demoStore.vehicles.filter(v=>v.id!==id);return;}
     const { error } = await supabase
       .from('vehicles')
       .delete()

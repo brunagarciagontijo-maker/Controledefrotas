@@ -1,3 +1,4 @@
+import { safeSignatureSource } from '../utils/signature';
 import { Modal } from './Modal';
 import type { VehicleRecord } from '../types/database';
 import { formatDateBR } from '../utils/date';
@@ -68,7 +69,7 @@ export function RecordDetails({ record, isOpen, onClose }: RecordDetailsProps) {
                 <span className="font-medium text-gray-600">Assinatura:</span>
                 <div className="mt-2 border rounded p-2 bg-gray-50">
                   <img
-                    src={record.pickup_signature}
+                    src={safeSignatureSource(record.pickup_signature)}
                     alt="Assinatura de retirada"
                     className="max-w-full h-auto"
                   />
@@ -100,7 +101,7 @@ export function RecordDetails({ record, isOpen, onClose }: RecordDetailsProps) {
                 <span className="font-medium text-gray-600">Assinatura:</span>
                 <div className="mt-2 border rounded p-2 bg-gray-50">
                   <img
-                    src={record.return_signature || ''}
+                    src={safeSignatureSource(record.return_signature || '')}
                     alt="Assinatura de devolução"
                     className="max-w-full h-auto"
                   />
@@ -120,9 +121,9 @@ export function RecordDetails({ record, isOpen, onClose }: RecordDetailsProps) {
         )}
 
         <div className="text-xs text-gray-500 border-t pt-3">
-          <p>Criado em: {new Date(record.created_at).toLocaleString('pt-BR')}</p>
+          <p>Criado em: {record.created_at ? new Date(record.created_at).toLocaleString('pt-BR') : '-'}</p>
           {record.updated_at !== record.created_at && (
-            <p>Atualizado em: {new Date(record.updated_at).toLocaleString('pt-BR')}</p>
+            <p>Atualizado em: {record.updated_at ? new Date(record.updated_at).toLocaleString('pt-BR') : '-'}</p>
           )}
         </div>
       </div>

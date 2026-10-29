@@ -1,284 +1,73 @@
-import { useEffect, useState } from 'react';
-import { BarChart3, Car, ClipboardCheck, Database, FileText, LogOut } from 'lucide-react';
-import { VehicleForm } from './components/VehicleForm';
-import { DatabaseView } from './components/DatabaseView';
-import { Dashboard } from './components/Dashboard';
+import { useCallback, useState } from 'react';
+import { Car, ClipboardCheck, Database, LogOut } from 'lucide-react';
 import { VehiclesView } from './components/VehiclesView';
-import { OperationalView } from './components/OperationalView';
+import { UnifiedPortaria } from './components/UnifiedPortaria';
 import { Toast } from './components/Toast';
-import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { useAuth } from './auth/context';
 import { Login } from './components/Login';
-import type { UserRole } from './components/Login';
 import { InspectionBell } from './components/InspectionBell';
-import { vehicleService } from './services/vehicleService';
-import type { VehicleRecord } from './types/database';
 
-type Tab = 'form' | 'database' | 'dashboard' | 'operational' | 'vehicles';
+import{ManagementView,type ManagementSection}from'./components/ManagementView';
 
-interface ToastState {
-  message: string;
-  type: 'success' | 'error';
-  show: boolean;
-}
+type Tab = 'gestao' | 'portaria' | 'veiculos';
+const navigation = [
+  { key: 'gestao', label: 'Gest\u00e3o', Icon: Database },
+  { key: 'portaria', label: 'Pátio', Icon: ClipboardCheck },
+  { key: 'veiculos', label: 'Veículos', Icon: Car },
+] as const;
 
-function getStartupRoute() {
+function startup() {
   const params = new URLSearchParams(window.location.search);
-  const tab = params.get('tab')?.toLowerCase();
-  const vehicleLookup = params.get('veiculo') || params.get('vehicle') || params.get('codigo') || params.get('code') || '';
-  const accessLookup = params.get('pessoa') || params.get('person') || params.get('veiculo_pessoal') || params.get('personal_vehicle') || '';
-
-  return {
-    tab:
-      tab === 'portaria' || tab === 'access' || accessLookup
-        ? 'operational'
-        : tab === 'patio' || tab === 'operational' || vehicleLookup
-        ? 'operational'
-        : 'form',
-    vehicleLookup,
-    accessLookup,
-  } satisfies { tab: Tab; vehicleLookup: string; accessLookup: string };
+  const vehicle = params.get('veiculo') || params.get('vehicle') || params.get('codigo') || params.get('code') || '';
+  const person = params.get('pessoa') || params.get('person') || params.get('veiculo_pessoal') || params.get('personal_vehicle') || '';
+  const requested = params.get('tab')?.toLowerCase();
+  const tab: Tab = requested === 'form' || requested === 'registro' ? 'portaria'
+    : ['database','banco','dashboard','relatorios','gestao'].includes(requested||'') ? 'gestao'
+    : requested === 'vehicles' || requested === 'veiculos' ? 'veiculos' : 'portaria';
+  return { vehicle, person, managementSection: (requested==='dashboard'||requested==='relatorios'?'indicadores':'anteriores') as ManagementSection, openDeparture: requested==='form'||requested==='registro', tab: person ? 'portaria' as const : tab };
 }
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>('admin');
-  const startupRoute = getStartupRoute();
-  const [activeTab, setActiveTab] = useState<Tab>(startupRoute.tab);
-  const [operationalLookup] = useState(startupRoute.vehicleLookup);
-  const [accessLookup] = useState(startupRoute.accessLookup);
-  const [toast, setToast] = useState<ToastState>({ message: '', type: 'success', show: false });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [records, setRecords] = useState<VehicleRecord[]>([]);
-
-  useEffect(() => {
-    if (activeTab === 'dashboard') {
-      loadRecords();
-    }
-  }, [activeTab, refreshTrigger]);
-
-  useEffect(() => {
-    const auth = localStorage.getItem('isAuthenticated');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
-      const storedRole = localStorage.getItem('userRole');
-      if (storedRole === 'porteiro' || storedRole === 'admin') {
-        setUserRole(storedRole);
-      }
-    }
-  }, []);
-
-  const loadRecords = async () => {
-    try {
-      const data = await vehicleService.listRecords();
-      setRecords(data);
-    } catch (error) {
-      console.error('Erro ao carregar registros:', error);
-    }
-  };
-
-  const handleLogin = (role: UserRole) => {
-    setIsAuthenticated(true);
-    setUserRole(role);
-  };
-
-  const handleLogout = () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userRole');
-      setIsAuthenticated(false);
-      setActiveTab('form');
-    }
-  };
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type, show: true });
-  };
-
-  const handleFormSuccess = () => {
-    showToast('Registro salvo com sucesso', 'success');
-    setRefreshTrigger((prev) => prev + 1);
-    setTimeout(() => {
-      setActiveTab('database');
-    }, 1500);
-  };
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  return (
-    <div className="min-h-screen gradient-mesh pb-20">
-      <div className="decoration-sphere decoration-sphere-1" />
-      <div className="decoration-sphere decoration-sphere-2" />
-      <div className="decoration-sphere decoration-sphere-3" />
-      <div className="decoration-sphere decoration-sphere-4" />
-      <div className="decoration-sphere decoration-sphere-5" />
-      <div className="decoration-sphere decoration-sphere-6" />
-
-      <div className="decoration-accent decoration-accent-1" />
-      <div className="decoration-accent decoration-accent-2" />
-      <div className="decoration-accent decoration-accent-3" />
-
-      <div className="glass sticky top-0 z-40 border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3 animate-slide-in">
-              <div className="relative">
-                <img
-                  src="/gontijofundacoes_logo.jpg"
-                  alt="Logo Gontijo"
-                  className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
-                />
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900">
-                  Controle de Veiculos
-                </h1>
-                <p className="text-xs text-gray-500">
-                  Gestao inteligente de frotas
-                </p>
-              </div>
-            </div>
-
-            {userRole === 'porteiro' && <InspectionBell completedBy="lorena" />}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 mb-20">
-        {activeTab === 'form' && (
-          <div className="animate-fade-in">
-            <div className="mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                Novo Registro
-              </h2>
-              <p className="text-gray-600">
-                Registre a retirada com assinatura. A devolucao e feita depois no mesmo registro.
-              </p>
-            </div>
-            <VehicleForm
-              onSuccess={handleFormSuccess}
-              onError={(message) => showToast(message, 'error')}
-            />
-          </div>
-        )}
-
-        {activeTab === 'database' && (
-          <div className="animate-fade-in">
-            <div className="mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                Banco de Dados
-              </h2>
-              <p className="text-gray-600">
-                Visualize, busque, exporte e gerencie todos os registros
-              </p>
-            </div>
-            <DatabaseView
-              onSuccess={(message) => showToast(message, 'success')}
-              onError={(message) => showToast(message, 'error')}
-              refreshTrigger={refreshTrigger}
-            />
-          </div>
-        )}
-
-        {activeTab === 'dashboard' && (
-          <div className="animate-fade-in">
-            <Dashboard records={records} />
-          </div>
-        )}
-
-        {activeTab === 'operational' && (
-          <div className="animate-fade-in">
-            <OperationalView
-              initialVehicleLookup={operationalLookup}
-              initialAccessLookup={accessLookup}
-              onSuccess={(message) => showToast(message, 'success')}
-              onError={(message) => showToast(message, 'error')}
-            />
-          </div>
-        )}
-
-        {activeTab === 'vehicles' && (
-          <div className="animate-fade-in">
-            <VehiclesView
-              userRole={userRole}
-              onSuccess={(message) => showToast(message, 'success')}
-              onError={(message) => showToast(message, 'error')}
-            />
-          </div>
-        )}
-      </div>
-
-      {toast.show && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast((prev) => ({ ...prev, show: false }))}
-        />
-      )}
-
-      <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/20 safe-area-inset-bottom">
-        <div className="max-w-2xl mx-auto px-2 sm:px-4">
-          <div className="grid grid-cols-6 gap-1 py-3">
-            <button
-              onClick={() => setActiveTab('form')}
-              className={`flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'form' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <FileText className={`w-6 h-6 ${activeTab === 'form' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-              <span className="text-[11px] sm:text-xs font-medium">Registro</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('database')}
-              className={`flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'database' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Database className={`w-6 h-6 ${activeTab === 'database' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-              <span className="text-[11px] sm:text-xs font-medium">Banco</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'dashboard' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <BarChart3 className={`w-6 h-6 ${activeTab === 'dashboard' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-              <span className="text-[11px] sm:text-xs font-medium">Relatorios</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('operational')}
-              className={`flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'operational' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <ClipboardCheck className={`w-6 h-6 ${activeTab === 'operational' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-              <span className="text-[11px] sm:text-xs font-medium">Patio</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('vehicles')}
-              className={`flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'vehicles' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Car className={`w-6 h-6 ${activeTab === 'vehicles' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-              <span className="text-[11px] sm:text-xs font-medium">Veiculos</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex flex-col items-center gap-1 py-2 px-1 sm:px-3 rounded-lg transition-all duration-200 text-gray-500 hover:text-red-600"
-            >
-              <LogOut className="w-6 h-6 stroke-2" />
-              <span className="text-[11px] sm:text-xs font-medium">Sair</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <PWAInstallPrompt />
+function AuthenticatedApp() {
+  const { profile, signOut } = useAuth();
+  const [route] = useState(startup);
+  const [tab, setTab] = useState<Tab>(route.tab);
+  const [departureIntent,setDepartureIntent]=useState(route.openDeparture);
+  const [refresh, setRefresh] = useState(0);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const success = useCallback((message: string) => { setToast({ message, type: 'success' }); setRefresh(value => value + 1); }, []);
+  const error = useCallback((message: string) => setToast({ message, type: 'error' }), []);
+  const navigate = (next: Tab) => { if(next==='portaria')setDepartureIntent(false);setTab(next); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  return <div className="min-h-screen gradient-mesh pb-28">
+    <div aria-hidden="true" className="pointer-events-none">
+      {[1, 2, 3, 4, 5, 6].map(n => <div key={n} className={`decoration-sphere decoration-sphere-${n}`} />)}
+      {[1, 2, 3].map(n => <div key={n} className={`decoration-accent decoration-accent-${n}`} />)}
     </div>
-  );
+    <header className="glass sticky top-0 z-40 border-b border-white/20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between gap-3 py-4">
+        <div className="flex min-w-0 items-center gap-3 animate-slide-in"><img src="/gontijofundacoes_logo.jpg" alt="Logo Gontijo" className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14" />
+          <div className="min-w-0"><h1 className="text-lg font-bold text-gray-900 sm:text-xl">Controle de Veículos</h1><p className="text-xs text-gray-500">Gestão inteligente de frotas · Sistema Portaria</p><p className="mt-1 truncate text-xs font-medium text-red-700">{profile!.display_name} · {profile!.role === 'admin' ? 'Administrador' : 'Portaria'}</p></div>
+        </div><InspectionBell />
+      </div></div>
+    </header>
+    <main id="conteudo-principal" className="relative mx-auto mb-6 max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      {(tab === 'portaria') && <div className="animate-fade-in"><UnifiedPortaria key={String(departureIntent)} startWithForm={departureIntent} initialVehicleLookup={route.vehicle} initialAccessLookup={route.person} onSuccess={success} onError={error} /></div>}
+      {tab==='gestao'&&<ManagementView initialSection={route.managementSection} onSuccess={success} onError={error} refresh={refresh} onNew={()=>{setDepartureIntent(true);setTab('portaria');}}/>}
+      {tab === 'veiculos' && <div className="animate-fade-in"><VehiclesView userRole={profile!.role} onSuccess={success} onError={error} /></div>}
+    </main>
+    {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+    <nav aria-label="Navegação principal" className="glass fixed inset-x-0 bottom-0 z-50 border-t border-white/20 safe-area-inset-bottom"><div className="mx-auto grid max-w-2xl grid-cols-4 gap-1 px-2 py-3 sm:px-4">
+      {navigation.map(({ key, label, Icon }) => <button key={key} onClick={() => navigate(key)} aria-current={tab === key ? 'page' : undefined} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium transition-all sm:px-3 sm:text-xs ${tab === key ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}><Icon className={`h-6 w-6 ${tab === key ? 'stroke-[2.5]' : 'stroke-2'}`} /><span>{label}</span></button>)}
+      <button onClick={() => setLogoutOpen(true)} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[10px] font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 sm:text-xs"><LogOut className="h-6 w-6" />Sair</button>
+    </div></nav>
+    {logoutOpen && <div role="dialog" aria-modal="true" aria-label="Sair do sistema" className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4"><div className="section-card w-full max-w-sm space-y-5"><h2 className="text-xl font-bold">Sair do sistema?</h2><p className="text-sm text-gray-600">Confirme que concluiu os formulários em andamento.</p><div className="flex gap-3"><button className="action-secondary flex-1" onClick={() => setLogoutOpen(false)}>Continuar no sistema</button><button className="action-primary flex-1" onClick={() => void signOut()}>Confirmar saída da conta</button></div></div></div>}
+  </div>;
 }
 
-export default App;
+export default function App() {
+  const { status, message, signOut, refreshAccess } = useAuth();
+  if (status === 'loading') return <main className="grid min-h-screen place-items-center"><p role="status">Validando acesso…</p></main>;
+  if (status === 'anonymous') return <Login />;
+  if (status === 'denied') return <main className="grid min-h-screen place-items-center p-5"><section className="section-card max-w-lg"><h1 className="text-xl font-bold">Acesso bloqueado</h1><p role="alert" className="my-4">{message}</p><div className="flex gap-3"><button onClick={() => void refreshAccess()} className="action-primary">Verificar novamente</button><button onClick={() => void signOut()} className="action-secondary">Sair</button></div></section></main>;
+  return <AuthenticatedApp />;
+}

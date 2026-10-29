@@ -1,0 +1,54 @@
+import { expect } from '@playwright/test';
+import { test } from './camera-fixture';
+
+test.use({ baseURL: 'http://127.0.0.1:5274', reducedMotion: 'reduce' });
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-27T13:00:00Z'));
+  await page.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:5274' ? route.continue() : route.abort());
+  await page.goto('/'); await page.getByRole('button', { name: 'Simular porteiro', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferência diária', exact: true }).click();
+  await page.getByRole('button', { name: 'Iniciar conferência', exact: true }).click();
+});
+test('oleo inline exige nivel, destaca critico e tentativa posterior preserva medicao e historico', async ({ page }) => {
+  const row = page.getByRole('article', { name: 'Conferir TESTE-2', exact: true });
+  await row.getByText('Histórico de óleo — TESTE-2', { exact: true }).click();
+  await expect(row.getByText('Sem verificação anterior', { exact: true })).toBeVisible();
+  await row.getByText('Histórico de óleo — TESTE-2', { exact: true }).click();
+  await row.getByRole('button', { name: 'OK', exact: true }).click();
+  await expect(row.getByText('Sem verificação anterior', { exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Confirmar OK e óleo', exact: true })).toBeDisabled();
+  await row.getByLabel('Nível atual do óleo de TESTE-2', { exact: true }).selectOption('critical');
+  await row.getByLabel('Observações do óleo de TESTE-2', { exact: true }).fill('Medição FICTÍCIA para teste');
+  await expect(row.getByText('Óleo crítico.', { exact: false })).toBeVisible();
+  await expect(page).toHaveScreenshot('oleo-inline.png', { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.005 });
+  await row.getByRole('button', { name: 'Confirmar OK e óleo', exact: true }).click();
+  await expect(row.getByText('Última medição válida: Crítico', { exact: true })).toBeVisible();
+  await expect(row.getByText('Dias desde a última medição válida:', { exact: false })).toContainText('0');
+  await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'));
+  await page.getByLabel('Dia da conferência').fill('2026-10-31');
+  await page.getByRole('button', { name: 'Iniciar conferência', exact: true }).click();
+  await row.getByRole('button', { name: 'OK', exact: true }).click();
+  await expect(row.getByText('Dias desde a última medição válida:', { exact: false })).toContainText('4');
+  await row.getByLabel('Nível atual do óleo de TESTE-2', { exact: true }).selectOption('unable');
+  await row.getByRole('button', { name: 'Confirmar OK e óleo', exact: true }).click();
+  await expect(row.getByText('Última tentativa: Não foi possível verificar', { exact: false })).toBeVisible();
+  await expect(row.getByText('Dias desde a última medição válida:', { exact: false })).toContainText('4');
+  await row.getByText('Histórico de óleo — TESTE-2', { exact: true }).click();
+  await expect(row.getByText('Não foi possível verificar ·', { exact: false }).last()).toBeVisible();
+  await expect(row.getByText('Crítico ·', { exact: false }).last()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('NOK dispensa oleo e achado sem veiculo fica pendente sem permitir OK', async ({ page }) => {
+  const row = page.getByRole('article', { name: 'Conferir TESTE-3', exact: true });
+  await row.getByRole('button', { name: 'NOK', exact: true }).click();
+  await expect(row.getByText('NOK', { exact: true })).toBeVisible();
+  await expect(row.getByLabel('Nível atual do óleo de TESTE-3')).toHaveCount(0);
+  await page.getByText('Registrar veículo encontrado e não listado', { exact: true }).click();
+  await page.getByLabel('Placa encontrada', { exact: true }).fill('EXTRA-OIL');
+  await page.getByLabel('Divergência do veículo não listado').fill('Identificação FICTÍCIA pendente');
+  await page.getByRole('button', { name: 'Registrar achado para identificação', exact: true }).click();
+  const found = page.getByRole('article', { name: 'Conferir EXTRA-OIL', exact: true });
+  await expect(found.getByText('Pendente', { exact: true })).toBeVisible();
+  await expect(found.getByRole('button', { name: 'OK', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

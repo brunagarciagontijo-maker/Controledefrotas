@@ -1,3 +1,9 @@
+# Referencia historica ? nao utilizar para configurar o DEV
+
+Este documento descreve a versao anterior. Autenticacao local, instrucoes SQL e procedimentos de ambiente abaixo estao obsoletos. Utilize [DEV_SETUP.md](DEV_SETUP.md) e [README.md](README.md).
+
+---
+
 # Documentacao do Sistema de Controle de Frotas
 
 ## 1. Visao geral

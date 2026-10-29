@@ -1,4 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { reportError } from '../utils/diagnostics';
+import { extractDevLookup } from '../lib/environment';
+import { requireDevEnvironment } from '../lib/runtime';
+import { FormEvent, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Building2,
   CalendarDays,
@@ -16,6 +19,8 @@ import { Input } from './Input';
 import { Modal } from './Modal';
 import { Textarea } from './Textarea';
 import { BarcodeScanner } from './BarcodeScanner';
+import { CameraCapture } from './CameraCapture';
+import { validatePersonEntry } from '../domain/portaria';
 import { accessControlService } from '../services/accessControlService';
 import { vehicleCatalogService } from '../services/vehicleCatalogService';
 import { formatDateBR, toDateInputValue } from '../utils/date';
@@ -53,23 +58,7 @@ function isTransvelentimText(value?: string | null) {
 }
 
 function extractLookupValue(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-
-  try {
-    const parsed = new URL(trimmed, window.location.origin);
-    return (
-      parsed.searchParams.get('pessoa') ||
-      parsed.searchParams.get('person') ||
-      parsed.searchParams.get('veiculo_pessoal') ||
-      parsed.searchParams.get('personal_vehicle') ||
-      parsed.searchParams.get('codigo') ||
-      parsed.searchParams.get('code') ||
-      trimmed
-    );
-  } catch {
-    return trimmed;
-  }
+  return extractDevLookup(value, ["pessoa","person","veiculo_pessoal","personal_vehicle","codigo","code"], requireDevEnvironment().appUrl);
 }
 
 function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info' }) {
@@ -123,6 +112,8 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
   const [entryTime, setEntryTime] = useState(getCurrentTimeValue());
   const [observations, setObservations] = useState('');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentCaptured,setDocumentCaptured]=useState(false);
+  useEffect(()=>{setDocumentFile(null);setDocumentCaptured(false);setReason('');},[entryKind]);
   const [savingEntry, setSavingEntry] = useState(false);
 
   const [historySearch, setHistorySearch] = useState('');
@@ -131,7 +122,7 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
   const [historyStartDate, setHistoryStartDate] = useState('');
   const [historyEndDate, setHistoryEndDate] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [peopleData, vehicleData, fleetVehicleData, recordData] = await Promise.all([
@@ -145,22 +136,18 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
       setFleetVehicles(fleetVehicleData);
       setRecords(recordData);
     } catch (error) {
-      console.error('Erro ao carregar portaria:', error);
+      reportError('Erro ao carregar portaria:', error);
       onError('Erro ao carregar dados da portaria');
     } finally {
       setLoading(false);
     }
-  };
+  }, [onError]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  useEffect(() => {
-    if (initialLookup && people.length > 0) {
-      handleLookup(initialLookup);
-    }
-  }, [initialLookup, people.length, vehicles.length]);
+
 
   const activePeople = useMemo(() => people.filter((person) => person.is_active), [people]);
   const internalPeople = useMemo(
@@ -212,8 +199,9 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
     });
   }, [historyEndDate, historySearch, historyStartDate, historyStatusFilter, historyTypeFilter, records]);
 
-  const handleLookup = (rawValue: string) => {
-    const lookup = normalizeLookup(extractLookupValue(rawValue));
+  const handleLookup = useCallback((rawValue: string) => {
+    let lookup: string;
+    try { lookup = normalizeLookup(extractLookupValue(rawValue)); } catch { onError('QR Code fora do ambiente DEV.'); return; }
     if (!lookup) return;
 
     const vehicle = vehicles.find((item) =>
@@ -242,7 +230,13 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
       setPersonSearch(person.name);
       setActiveTab('entrada');
     }
-  };
+  }, [vehicles, people, onError]);
+
+  useEffect(() => {
+    if (initialLookup && people.length > 0) {
+      handleLookup(initialLookup);
+    }
+  }, [initialLookup, people.length, handleLookup]);
 
   const resetEntryForm = () => {
     setEntryKind('Funcionario');
@@ -260,16 +254,15 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
     setEntryTime(getCurrentTimeValue());
     setObservations('');
     setDocumentFile(null);
+    setDocumentCaptured(false);
   };
 
   const handleEntrySubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const host = selectedHostId ? people.find((person) => person.id === selectedHostId) : null;
 
-    if (!reason.trim()) {
-      onError('Informe o motivo da visita');
-      return;
-    }
+    const validation=validatePersonEntry(entryKind,reason,documentFile,documentCaptured);
+    if(validation.length){onError(validation[0]);return;}
 
     try {
       setSavingEntry(true);
@@ -333,18 +326,19 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
           host_person_name: host?.name || '',
           personal_vehicle_id: accessVehicle?.id || null,
           vehicle_plate: accessVehicle?.plate || manualPlate,
-          reason,
+          reason: entryKind === 'Funcionario' ? '' : reason,
           entry_date: entryDate,
           entry_time: entryTime,
           observations,
         },
-        documentFile
+        documentFile,
+        documentCaptured
       );
       onSuccess('Entrada registrada com sucesso');
       resetEntryForm();
       await loadData();
     } catch (error) {
-      console.error('Erro ao registrar entrada:', error);
+      reportError('Erro ao registrar entrada:', error);
       onError('Erro ao registrar entrada');
     } finally {
       setSavingEntry(false);
@@ -357,7 +351,7 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
       onSuccess('Saida registrada com sucesso');
       await loadData();
     } catch (error) {
-      console.error('Erro ao registrar saida:', error);
+      reportError('Erro ao registrar saida:', error);
       onError('Erro ao registrar saida');
     }
   };
@@ -374,7 +368,7 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
       }
     } catch (error) {
       newTab?.close();
-      console.error('Erro ao abrir documento:', error);
+      reportError('Erro ao abrir documento:', error);
       onError('Documento indisponivel');
     }
   };
@@ -684,13 +678,13 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
                 placeholder={entryKind === 'Funcionario' ? 'Opcional' : 'Opcional se entrar com veiculo'}
               />
 
-              <Input
+              {entryKind !== 'Funcionario' && <Input
                 label="Motivo da visita"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Ex: visita, manutencao, entrega"
                 required
-              />
+              />}
 
               {entryKind !== 'Funcionario' && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
@@ -698,14 +692,8 @@ export function AccessControlView({ initialLookup = '', onSuccess, onError }: Ac
                     <FileText className="w-4 h-4" />
                     Documento do {entryKind === 'Visitante' ? 'visitante' : 'terceirizado'} *
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    capture="environment"
-                    onChange={(event) => setDocumentFile(event.target.files?.[0] || null)}
-                    className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-xl file:border-0 file:bg-red-600 file:px-4 file:py-2 file:text-white file:font-semibold hover:file:bg-red-700"
-                  />
-                  {documentFile && <Badge tone="warning">{documentFile.name}</Badge>}
+                  <CameraCapture key={entryKind} label="Foto do documento" captured={documentCaptured} onCapture={file=>{setDocumentFile(file);setDocumentCaptured(true);}} />
+                  {entryKind==='Terceirizado'&&<label className="block text-sm">Ou anexar documento (PDF/imagem)<input className="mt-2 block w-full" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event=>{setDocumentFile(event.target.files?.[0]||null);setDocumentCaptured(false);}}/></label>}
                 </div>
               )}
 

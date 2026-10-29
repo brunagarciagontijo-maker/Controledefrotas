@@ -1,4 +1,9 @@
+import { signedFileUrl, validateUpload } from '../lib/privateFiles';
 import { supabase } from '../lib/supabase';
+import { isDemo } from '../demo/mode';
+import { demoStore } from '../domain/demoStore';
+import { validatePersonEntry } from '../domain/portaria';
+import { requireDevEnvironment } from '../lib/runtime';
 import type {
   AccessRecord,
   AccessRecordInput,
@@ -41,6 +46,7 @@ function normalizeNullable(value?: string | null) {
 }
 
 async function uploadPrivateFile(bucket: string, folder: string, file: File) {
+  validateUpload(file, 'document');
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const filePath = `${folder}/${Date.now()}-${safeName}`;
   const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
@@ -57,6 +63,7 @@ async function uploadPrivateFile(bucket: string, folder: string, file: File) {
 
 export const accessControlService = {
   async listPeople(filters?: PeopleFilters): Promise<PersonRecord[]> {
+    if(isDemo())return demoStore.snapshot().people.filter(row=>(!filters?.personType||filters.personType==='Todos'||row.person_type===filters.personType)&&(!filters?.status||filters.status==='Todos'||row.is_active===(filters.status==='Ativos'))&&(!filters?.search||[row.name,row.short_code,row.company,row.phone].some(v=>v?.toLowerCase().includes(filters.search!.trim().toLowerCase()))));
     let query = supabase.from('people').select('*').order('name', { ascending: true });
 
     const search = clean(filters?.search);
@@ -84,6 +91,7 @@ export const accessControlService = {
   },
 
   async createPerson(input: PersonInput): Promise<PersonRecord> {
+    if(isDemo())return demoStore.createPerson(input);
     const payload = {
       person_type: input.person_type,
       name: input.name.trim(),
@@ -98,12 +106,13 @@ export const accessControlService = {
       is_driver: input.is_driver ?? false,
     };
 
-    const { data, error } = await supabase.from('people').insert(payload as never).select().single();
+    const { data, error } = await supabase.from('people').insert(payload).select().single();
     if (error) throw error;
     return data;
   },
 
   async updatePerson(id: string, input: Partial<PersonInput>): Promise<PersonRecord> {
+    if(isDemo())return demoStore.updatePerson(id,input);
     const payload = {
       ...(input.person_type ? { person_type: input.person_type } : {}),
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
@@ -125,7 +134,7 @@ export const accessControlService = {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase.from('people').update(payload as never).eq('id', id).select().single();
+    const { data, error } = await supabase.from('people').update(payload).eq('id', id).select().single();
     if (error) throw error;
     return data;
   },
@@ -139,6 +148,7 @@ export const accessControlService = {
   },
 
   async uploadPersonCnh(person: PersonRecord, file: File): Promise<PersonRecord> {
+    if(isDemo()){validateUpload(file,'document');const path=crypto.randomUUID();demoStore.documents.set(path,file);return demoStore.updatePerson(person.id,{cnh_file_path:path,cnh_file_name:file.name,cnh_file_type:file.type});}
     if (file.size > 10 * 1024 * 1024) {
       throw new Error('O anexo da CNH deve ter no maximo 10 MB');
     }
@@ -152,24 +162,30 @@ export const accessControlService = {
         cnh_file_type: file.type || null,
       });
 
-      if (person.cnh_file_path) {
+      if (person.cnh_file_path && requireDevEnvironment().mode !== 'original') {
         await supabase.storage.from(PERSON_DOCUMENTS_BUCKET).remove([person.cnh_file_path]);
       }
 
       return updated;
     } catch (error) {
-      await supabase.storage.from(PERSON_DOCUMENTS_BUCKET).remove([filePath]);
+      // Uma resposta perdida nao comprova falha da atualizacao. No original,
+      // preservar os dois arquivos; limpeza exige operacao administrativa aprovada.
+      if(requireDevEnvironment().mode !== 'original')await supabase.storage.from(PERSON_DOCUMENTS_BUCKET).remove([filePath]);
       throw error;
     }
   },
 
   async getPersonDocumentUrl(filePath: string): Promise<string> {
-    const { data, error } = await supabase.storage.from(PERSON_DOCUMENTS_BUCKET).createSignedUrl(filePath, 60 * 10);
-    if (error || !data?.signedUrl) throw error || new Error('Documento indisponivel');
-    return data.signedUrl;
+    if(isDemo()){const file=demoStore.documents.get(filePath);if(!file)throw new Error('Anexe um documento fictício para testar a visualização.');return URL.createObjectURL(file);}
+    if(requireDevEnvironment().mode==='original'){
+      const {data:bucket,error}=await supabase.rpc('portaria_document_bucket',{file_path:filePath});
+      if(error||!bucket)throw new Error('Documento privado ausente ou ambiguo.');return signedFileUrl(bucket,filePath);
+    }
+    return signedFileUrl(PERSON_DOCUMENTS_BUCKET, filePath);
   },
 
   async listPersonalVehicles(): Promise<PersonalVehicle[]> {
+    if(isDemo())return structuredClone(demoStore.personalVehicles).map(v=>({...v,person:demoStore.snapshot().people.find(p=>p.id===v.person_id)}));
     const { data, error } = await supabase
       .from('personal_vehicles')
       .select('*, person:people(*)')
@@ -180,6 +196,7 @@ export const accessControlService = {
   },
 
   async createPersonalVehicle(input: PersonalVehicleInput): Promise<PersonalVehicle> {
+    if(isDemo())return demoStore.createPersonalVehicle(input);
     const payload = {
       person_id: input.person_id,
       plate: normalizeText(input.plate),
@@ -188,12 +205,13 @@ export const accessControlService = {
       is_active: input.is_active ?? true,
     };
 
-    const { data, error } = await supabase.from('personal_vehicles').insert(payload as never).select('*, person:people(*)').single();
+    const { data, error } = await supabase.from('personal_vehicles').insert(payload).select('*, person:people(*)').single();
     if (error) throw error;
     return data;
   },
 
   async updatePersonalVehicle(id: string, input: Partial<PersonalVehicleInput>): Promise<PersonalVehicle> {
+    if(isDemo())return demoStore.updatePersonalVehicle(id,input);
     const payload = {
       ...(input.person_id ? { person_id: input.person_id } : {}),
       ...(input.plate !== undefined ? { plate: normalizeText(input.plate) } : {}),
@@ -205,7 +223,7 @@ export const accessControlService = {
 
     const { data, error } = await supabase
       .from('personal_vehicles')
-      .update(payload as never)
+      .update(payload)
       .eq('id', id)
       .select('*, person:people(*)')
       .single();
@@ -214,6 +232,7 @@ export const accessControlService = {
   },
 
   async listAccessRecords(filters?: AccessFilters): Promise<AccessRecord[]> {
+    if(isDemo())return demoStore.snapshot().accesses.filter(row=>(!filters?.status||filters.status==='Todos'||row.status===filters.status)&&(!filters?.personType||filters.personType==='Todos'||row.person_type===filters.personType)&&(!filters?.search||[row.person_name,row.vehicle_plate,row.short_code,row.host_person_name,row.reason].some(v=>v?.toLowerCase().includes(filters.search!.trim().toLowerCase())))&&(!filters?.startDate||row.entry_date>=filters.startDate)&&(!filters?.endDate||row.entry_date<=filters.endDate));
     let query = supabase.from('access_records').select('*').order('created_at', { ascending: false });
 
     const search = clean(filters?.search);
@@ -244,7 +263,11 @@ export const accessControlService = {
     return data || [];
   },
 
-  async createAccessRecord(input: AccessRecordInput, documentFile?: File | null): Promise<AccessRecord> {
+  async createAccessRecord(input: AccessRecordInput, documentFile?: File | null, captured = false): Promise<AccessRecord> {
+    const issues=validatePersonEntry(input.person_type,input.reason||'',documentFile||null,captured);
+    if(issues.length)throw new Error(issues[0]);
+    input={...input,reason:input.person_type==='Funcionario'?'':input.reason};
+    if(isDemo()){const path=documentFile?crypto.randomUUID():null;if(path&&documentFile)demoStore.documents.set(path,documentFile);return demoStore.enter(input,path);}
     let documentPath: string | null = null;
     if (documentFile) {
       documentPath = await uploadPrivateFile(ACCESS_DOCUMENTS_BUCKET, input.person_id, documentFile);
@@ -264,7 +287,7 @@ export const accessControlService = {
         status: 'Em aberto' as AccessStatus,
       };
 
-      const { data, error } = await supabase.from('access_records').insert(payload as never).select().single();
+      const { data, error } = await supabase.from('access_records').insert(payload).select().single();
       if (error) throw error;
       return data;
     } catch (error) {
@@ -276,6 +299,7 @@ export const accessControlService = {
   },
 
   async closeAccessRecord(id: string, exitDate: string, exitTime: string): Promise<AccessRecord> {
+    if(isDemo())return demoStore.leave(id,exitDate,exitTime);
     const { data, error } = await supabase
       .from('access_records')
       .update({
@@ -283,7 +307,7 @@ export const accessControlService = {
         exit_time: exitTime,
         status: 'Concluido',
         updated_at: new Date().toISOString(),
-      } as never)
+      })
       .eq('id', id)
       .select()
       .single();
@@ -293,8 +317,7 @@ export const accessControlService = {
   },
 
   async getAccessDocumentUrl(filePath: string): Promise<string> {
-    const { data, error } = await supabase.storage.from(ACCESS_DOCUMENTS_BUCKET).createSignedUrl(filePath, 60 * 10);
-    if (error || !data?.signedUrl) throw error || new Error('Documento indisponivel');
-    return data.signedUrl;
+    if(isDemo()){const file=demoStore.documents.get(filePath);if(!file)throw new Error('Documento fictício indisponível nesta sessão.');return URL.createObjectURL(file);}
+    return signedFileUrl(ACCESS_DOCUMENTS_BUCKET, filePath);
   },
 };

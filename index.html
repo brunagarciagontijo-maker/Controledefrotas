@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/jpeg" href="/gontijofundacoes_logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Sistema de Controle de Frotas</title>
+    <title>DEV ? Sistema Portaria</title>
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#b91c1c" />
@@ -13,52 +13,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Controle de Frotas" />
     
-    <!-- Manifest -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    
     <!-- Open Graph -->
     <meta property="og:title" content="Sistema de Controle de Frotas" />
     <meta property="og:description" content="Sistema de gestão de retirada e devolução de veículos com assinatura digital" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
+    <meta property="og:image" content="/gontijofundacoes_logo.jpg" />
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <meta name="twitter:image" content="/gontijofundacoes_logo.jpg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Registrar Service Worker -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(
-            (registration) => {
-              console.log('✅ Service Worker registrado com sucesso:', registration);
-              
-              // Verificar atualizações periodicamente
-              setInterval(() => {
-                registration.update();
-              }, 60000);
-              
-              // Notificar se houver uma nova versão esperando
-              registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('📦 Nova versão disponível!');
-                  }
-                });
-              });
-            },
-            (error) => {
-              console.warn('❌ Erro ao registrar Service Worker:', error);
-            }
-          );
-        });
-      }
-    </script>
   </body>
 </html>

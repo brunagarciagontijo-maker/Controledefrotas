@@ -1,0 +1,15 @@
+{
+  "projectRef": "",
+  "inventorySha256": "",
+  "backupReceiptSha256": "",
+  "recoveryStrategy": "no-backup-risk-accepted",
+  "recoveryWaiverSha256": "",
+  "restoreVerified": false,
+  "storageBackupVerified": false,
+  "sqlApproved": false,
+  "approvedSqlBundleSha256": "",
+  "remoteMigrationsApplied": false,
+  "postflightValidated": false,
+  "frontendOperationsApproved": false,
+  "deploymentApproved": false
+}

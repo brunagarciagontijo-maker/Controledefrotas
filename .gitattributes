@@ -1,0 +1,6 @@
+# Preserve binary assets byte-for-byte, including PDF cross-reference offsets.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

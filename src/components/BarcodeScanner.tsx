@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { reportError } from '../utils/diagnostics';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, ScanLine, AlertTriangle } from 'lucide-react';
 
 interface BarcodeScannerProps {
@@ -103,7 +104,7 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
         }
       }, 700);
     } catch (scanError) {
-      console.error('Erro ao iniciar camera:', scanError);
+      reportError('Erro ao iniciar camera:', scanError);
       setError('Nao foi possivel acessar a camera. Use a busca manual.');
     } finally {
       setIsStarting(false);

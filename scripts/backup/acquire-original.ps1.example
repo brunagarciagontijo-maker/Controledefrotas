@@ -1,0 +1,27 @@
+# MODELO BLOQUEADO. Nao usar como script de exportacao nem remover o bloqueio sem aprovacao.
+throw 'BLOQUEADO: falta aprovacao especifica, ferramentas, credenciais externas, escopo e janela de backup.'
+<#
+EXEMPLOS PARA O ADMINISTRADOR ADAPTAR FORA DO REPOSITORIO, NAO EXECUTAR AGORA.
+PGSERVICEFILE e PGPASSFILE: arquivos protegidos fora do repo; nunca senha/URL na linha de comando.
+O servico portaria_source deve usar TLS verify-full e conexao direta ou pooler SESSION.
+Reconfirmar servidor PostgreSQL 17 e clientes compativeis. Nenhuma instalacao automatica.
+
+$env:PGSERVICEFILE = 'CAMINHO_PRIVADO_FORA_DO_REPOSITORIO'
+$env:PGPASSFILE = 'CAMINHO_PRIVADO_FORA_DO_REPOSITORIO'
+$env:PGOPTIONS = '-c default_transaction_read_only=on'
+$privateRun = 'DIRETORIO_CRIPTOGRAFADO_FORA_DO_REPOSITORIO'
+
+& pg_dump --dbname='service=portaria_source' --format=custom --no-password --lock-wait-timeout=30s --file=(Join-Path $privateRun 'database.full.dump') 2> (Join-Path $privateRun 'dump.private.log')
+# Conferir LASTEXITCODE imediatamente. Erro/permissao insuficiente bloqueia; nao aceitar arquivo parcial.
+# Nao usar --no-acl, --no-owner, --enable-row-security ou exclusoes silenciosas no arquivo mestre.
+& pg_dumpall --dbname='service=portaria_source' --roles-only --no-role-passwords --no-password --file=(Join-Path $privateRun 'roles.private.sql') 2> (Join-Path $privateRun 'roles.private.log')
+# Roles nao tem snapshot atomico com dados: congelar DDL/grants e comparar antes/depois.
+& pg_restore --list --file=(Join-Path $privateRun 'toc.private.txt') (Join-Path $privateRun 'database.full.dump')
+# --list nao restaura, mas contem identificadores; nao imprimir/compartilhar seu conteudo.
+
+# 07 e 08 so serao consultados na origem apos aprovacao, com --quiet, --tuples-only,
+# --no-align, --set=ON_ERROR_STOP=1, --output privado e stderr em log privado.
+# O coletor de bytes S3/API e o empacotador de arquivos UUID ainda precisam de preparo/ensaio aprovado.
+# Nao usar sync, move, purge, delete ou public URLs como metodo de coleta.
+# Nao copiar objetos de nomes arbitrarios diretamente para Windows sem mapeamento reversivel.
+#>

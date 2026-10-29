@@ -1,3 +1,4 @@
+import { reportError } from '../utils/diagnostics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -112,7 +113,7 @@ export function PedestriansView({ onSuccess, onError }: PedestriansViewProps) {
       });
       setPeople(data);
     } catch (error) {
-      console.error('Erro ao carregar pessoas:', error);
+      reportError('Erro ao carregar pessoas:', error);
       onErrorRef.current('Não foi possível carregar o cadastro de pessoas.');
     } finally {
       setLoading(false);
@@ -158,7 +159,7 @@ export function PedestriansView({ onSuccess, onError }: PedestriansViewProps) {
       resetForm();
       await loadPeople();
     } catch (error) {
-      console.error('Erro ao salvar pessoa:', error);
+      reportError('Erro ao salvar pessoa:', error);
       onError(getPersonErrorMessage(error, editingId ? 'atualizar' : 'cadastrar'));
     } finally {
       setSaving(false);
@@ -200,7 +201,7 @@ export function PedestriansView({ onSuccess, onError }: PedestriansViewProps) {
       onSuccess(person.is_active ? 'Pessoa desativada com sucesso.' : 'Pessoa reativada com sucesso.');
       await loadPeople();
     } catch (error) {
-      console.error(`Erro ao ${action} pessoa:`, error);
+      reportError(`Erro ao ${action} pessoa:`, error);
       onError(getPersonErrorMessage(error, 'alterar'));
     } finally {
       setStatusChangingId(null);

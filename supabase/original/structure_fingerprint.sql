@@ -1,0 +1,12 @@
+-- Fragmento somente leitura usado pela precondicao da migration; sem registros pessoais.
+SELECT md5(string_agg(key || '|' || value,E'\n' ORDER BY key COLLATE "C")) FROM (
+  SELECT 'table:'||n.nspname||'.'||c.relname AS key,c.relkind::text||'|'||c.relrowsecurity::text||'|'||c.relforcerowsecurity::text AS value FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','private','portaria') AND c.relkind IN ('r','p','v','m')
+  UNION ALL SELECT 'column:'||table_schema||'.'||table_name||'.'||column_name,udt_name||'|'||(is_nullable='YES')::text||'|'||md5(coalesce(column_default,'')) FROM information_schema.columns WHERE table_schema IN ('public','private','portaria')
+  UNION ALL SELECT 'constraints:'||n.nspname||'.'||c.relname||'.'||k.conname,md5(pg_get_constraintdef(k.oid)) FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','private','portaria')
+  UNION ALL SELECT 'indexes:'||n.nspname||'.'||t.relname||'.'||i.relname,md5(pg_get_indexdef(i.oid)) FROM pg_index x JOIN pg_class t ON t.oid=x.indrelid JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname IN ('public','private','portaria')
+  UNION ALL SELECT 'triggers:'||n.nspname||'.'||c.relname||'.'||t.tgname,md5(pg_get_triggerdef(t.oid)) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','private','portaria','auth','storage') AND NOT t.tgisinternal
+  UNION ALL SELECT 'function:'||n.nspname||'.'||p.proname||'('||oidvectortypes(p.proargtypes)||')',md5(pg_get_functiondef(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private','portaria') AND p.prokind IN ('f','p')
+  UNION ALL SELECT 'policy:'||schemaname||'.'||tablename||'.'||policyname,permissive||'|'||array_to_string(roles,',')||'|'||cmd||'|'||md5(coalesce(qual,''))||'|'||md5(coalesce(with_check,'')) FROM pg_policies WHERE schemaname IN ('public','private','portaria','storage')
+  UNION ALL SELECT 'grant:'||table_schema||'.'||table_name||'.'||grantee||'.'||privilege_type,'1' FROM information_schema.table_privileges WHERE table_schema IN ('public','private','portaria','storage') AND grantee IN ('anon','authenticated','PUBLIC')
+  UNION ALL SELECT 'bucket:'||id,public::text||'|'||coalesce(file_size_limit::text,'')||'|'||coalesce(array_to_string(allowed_mime_types,','),'') FROM storage.buckets
+) objects

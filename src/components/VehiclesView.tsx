@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { reportError } from '../utils/diagnostics';
+import { escapeHtml } from '../utils/html';
+import { requireDevEnvironment } from '../lib/runtime';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { Car, Search, Wrench, CheckCircle2, PauseCircle, Plus, Edit2, Trash2, ListFilter, QrCode, Download, Printer, UserRound, ClipboardCheck } from 'lucide-react';
 import { Input } from './Input';
@@ -29,8 +32,7 @@ const INITIAL_FORM: FleetVehicleInput = {
 type VehiclesTab = 'fleet' | 'personal';
 
 function getQrBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_PUBLIC_APP_URL?.trim();
-  return (configuredUrl || window.location.origin).replace(/\/$/, '');
+  return requireDevEnvironment().appUrl;
 }
 
 function getVehicleQrUrl(vehicle: FleetVehicle) {
@@ -48,6 +50,7 @@ function getPersonalVehicleQrUrl(vehicle: PersonalVehicle) {
 }
 
 export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps) {
+  const canManage = userRole === 'admin';
   const [activeVehiclesTab, setActiveVehiclesTab] = useState<VehiclesTab>('fleet');
   const [inspectionVehicle, setInspectionVehicle] = useState<FleetVehicle | null>(null);
   const [inspectionNotes, setInspectionNotes] = useState('');
@@ -72,49 +75,49 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
   const [personalVehicleSaving, setPersonalVehicleSaving] = useState(false);
   const [personalVehicleSearch, setPersonalVehicleSearch] = useState('');
 
-  const loadVehicles = async () => {
+  const loadVehicles = useCallback(async () => {
     try {
       setLoading(true);
       const data = await vehicleCatalogService.listVehicles({ search, status: statusFilter });
       setVehicles(data);
     } catch (error) {
-      console.error('Erro ao carregar veículos:', error);
+      reportError('Erro ao carregar veículos:', error);
       onError('Erro ao carregar veículos');
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter, onError]);
 
-  const loadPersonalVehicles = async () => {
+  const loadPersonalVehicles = useCallback(async () => {
     try {
       setPersonalLoading(true);
       const data = await accessControlService.listPersonalVehicles();
       setPersonalVehicles(data);
     } catch (error) {
-      console.error('Erro ao carregar veiculos pessoais:', error);
+      reportError('Erro ao carregar veiculos pessoais:', error);
       onError('Erro ao carregar veiculos pessoais');
     } finally {
       setPersonalLoading(false);
     }
-  };
+  }, [onError]);
 
   useEffect(() => {
     loadVehicles();
-  }, [search, statusFilter]);
+  }, [loadVehicles]);
 
   useEffect(() => {
     loadPersonalVehicles();
-  }, []);
+  }, [loadPersonalVehicles]);
 
   useEffect(() => {
     operationalService
       .listDrivers()
       .then(setDrivers)
       .catch((error) => {
-        console.error('Erro ao carregar motoristas para veículos:', error);
+        reportError('Erro ao carregar motoristas para veículos:', error);
         onError('Erro ao carregar motoristas');
       });
-  }, []);
+  }, [onError]);
 
   const fixedDriverOptions = useMemo(() => {
     const activeNames = drivers.filter((driver) => driver.is_active).map((driver) => driver.name);
@@ -192,6 +195,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManage) { onError('Cadastro restrito ao administrador.'); return; }
 
     if (!validate()) {
       return;
@@ -211,7 +215,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
       resetForm();
       await loadVehicles();
     } catch (error) {
-      console.error('Erro ao salvar veículo:', error);
+      reportError('Erro ao salvar veículo:', error);
       const message =
         error && typeof error === 'object' && 'message' in error
           ? String((error as { message?: unknown }).message || '')
@@ -228,11 +232,12 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
   };
 
   const startEdit = (vehicle: FleetVehicle) => {
+    if (!canManage) { onError('Acao restrita ao administrador.'); return; }
     setEditingVehicleId(vehicle.id);
     setFormData({
       plate: vehicle.plate,
       name: vehicle.name,
-      responsible_name: vehicle.responsible_name,
+      responsible_name: vehicle.responsible_name || '',
       fixed_driver_name: vehicle.fixed_driver_name || '',
       status: vehicle.status,
     });
@@ -240,6 +245,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
   };
 
   const handleDelete = async (id: string) => {
+    if (!canManage) { onError('Acao restrita ao administrador.'); return; }
     const confirmed = confirm('Deseja realmente excluir este veículo?');
     if (!confirmed) {
       return;
@@ -255,7 +261,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
       await loadVehicles();
     } catch (error) {
-      console.error('Erro ao excluir veículo:', error);
+      reportError('Erro ao excluir veículo:', error);
       onError('Erro ao excluir veículo');
     }
   };
@@ -278,7 +284,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
       setQrDataUrl(dataUrl);
     } catch (error) {
-      console.error('Erro ao gerar QR Code:', error);
+      reportError('Erro ao gerar QR Code:', error);
       onError('Erro ao gerar QR Code do veÃ­culo');
     } finally {
       setQrGenerating(false);
@@ -303,7 +309,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
       setQrDataUrl(dataUrl);
     } catch (error) {
-      console.error('Erro ao gerar QR Code do veiculo pessoal:', error);
+      reportError('Erro ao gerar QR Code do veiculo pessoal:', error);
       onError('Erro ao gerar QR Code do veiculo pessoal');
     } finally {
       setQrGenerating(false);
@@ -315,7 +321,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
     const link = document.createElement('a');
     link.href = qrDataUrl;
-    link.download = `qr-${qrVehicle.plate}-${qrVehicle.short_code || 'veiculo'}.png`;
+    link.download = `qr-${escapeHtml(qrVehicle.plate)}-${qrVehicle.short_code || 'veiculo'}.png`;
     link.click();
   };
 
@@ -324,7 +330,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
     const link = document.createElement('a');
     link.href = qrDataUrl;
-    link.download = `qr-veiculo-pessoal-${personalQrVehicle.plate}-${personalQrVehicle.short_code || 'veiculo'}.png`;
+    link.download = `qr-veiculo-pessoal-${escapeHtml(personalQrVehicle.plate)}-${personalQrVehicle.short_code || 'veiculo'}.png`;
     link.click();
   };
 
@@ -340,7 +346,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
     printWindow.document.write(`
       <html>
         <head>
-          <title>QR ${qrVehicle.plate}</title>
+          <title>QR ${escapeHtml(qrVehicle.plate)}</title>
           <style>
             body { font-family: Arial, sans-serif; display: grid; min-height: 100vh; place-items: center; margin: 0; }
             .label { width: 320px; border: 2px solid #111827; border-radius: 18px; padding: 20px; text-align: center; }
@@ -353,9 +359,9 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
         <body>
           <div class="label">
             <img src="${qrDataUrl}" alt="QR Code do veiculo" />
-            <h1>${qrVehicle.plate}</h1>
-            <p>${qrVehicle.name}</p>
-            <p class="code">${qrVehicle.short_code || qrVehicle.plate}</p>
+            <h1>${escapeHtml(qrVehicle.plate)}</h1>
+            <p>${escapeHtml(qrVehicle.name)}</p>
+            <p class="code">${escapeHtml(qrVehicle.short_code || qrVehicle.plate)}</p>
           </div>
           <script>window.onload = () => { window.print(); window.close(); };</script>
         </body>
@@ -376,7 +382,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
     printWindow.document.write(`
       <html>
         <head>
-          <title>QR ${personalQrVehicle.plate}</title>
+          <title>QR ${escapeHtml(personalQrVehicle.plate)}</title>
           <style>
             body { font-family: Arial, sans-serif; display: grid; min-height: 100vh; place-items: center; margin: 0; }
             .label { width: 320px; border: 2px solid #111827; border-radius: 18px; padding: 20px; text-align: center; }
@@ -389,9 +395,9 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
         <body>
           <div class="label">
             <img src="${qrDataUrl}" alt="QR Code do veiculo pessoal" />
-            <h1>${personalQrVehicle.plate}</h1>
-            <p>${personalQrVehicle.person?.name || personalQrVehicle.name || 'Veiculo pessoal'}</p>
-            <p class="code">${personalQrVehicle.short_code || personalQrVehicle.plate}</p>
+            <h1>${escapeHtml(personalQrVehicle.plate)}</h1>
+            <p>${escapeHtml(personalQrVehicle.person?.name || personalQrVehicle.name || 'Veiculo pessoal')}</p>
+            <p class="code">${escapeHtml(personalQrVehicle.short_code || personalQrVehicle.plate)}</p>
           </div>
           <script>window.onload = () => { window.print(); window.close(); };</script>
         </body>
@@ -407,6 +413,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
 
   const handlePersonalVehicleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManage) { onError('Cadastro restrito ao administrador.'); return; }
 
     if (!personalVehicleForm.person_id || !personalVehicleForm.plate.trim()) {
       onError('Selecione a pessoa e informe a placa');
@@ -425,7 +432,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
       resetPersonalVehicleForm();
       await loadPersonalVehicles();
     } catch (error) {
-      console.error('Erro ao salvar veiculo pessoal:', error);
+      reportError('Erro ao salvar veiculo pessoal:', error);
       onError('Erro ao salvar veiculo pessoal. Verifique se a placa ja existe.');
     } finally {
       setPersonalVehicleSaving(false);
@@ -433,6 +440,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
   };
 
   const startPersonalVehicleEdit = (vehicle: PersonalVehicle) => {
+    if (!canManage) { onError('Acao restrita ao administrador.'); return; }
     setEditingPersonalVehicleId(vehicle.id);
     setPersonalVehicleForm({
       person_id: vehicle.person_id,
@@ -457,13 +465,12 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
         vehicle_id: inspectionVehicle.id,
         vehicle_plate: inspectionVehicle.plate,
         vehicle_name: inspectionVehicle.name,
-        requested_by: localStorage.getItem('username') || 'Admin',
         notes: inspectionNotes,
       });
       onSuccess('Inspeção solicitada. O porteiro foi notificado.');
       setInspectionVehicle(null);
     } catch (error) {
-      console.error('Erro ao solicitar inspeção:', error);
+      reportError('Erro ao solicitar inspeção:', error);
       onError('Erro ao solicitar inspeção');
     } finally {
       setInspectionSaving(false);
@@ -551,7 +558,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
             </h3>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}><fieldset disabled={!canManage} className="contents">
             <Input
               label="Placa"
               placeholder="ABC-1234"
@@ -633,7 +640,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                 </button>
               )}
             </div>
-          </form>
+          </fieldset></form>
         </section>
 
         <section className="xl:col-span-3 glass rounded-2xl p-6 shadow-premium">
@@ -696,7 +703,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                       )}
                       <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Cadastrado em {new Date(vehicle.created_at).toLocaleDateString('pt-BR')}
+                        Cadastrado em {vehicle.created_at ? new Date(vehicle.created_at).toLocaleDateString('pt-BR') : '-'}
                       </div>
                     </div>
 
@@ -721,7 +728,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                       </button>
                       <button
                         type="button"
-                        onClick={() => startEdit(vehicle)}
+                        disabled={!canManage} onClick={() => startEdit(vehicle)}
                         className="p-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50"
                         title="Editar"
                       >
@@ -729,7 +736,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(vehicle.id)}
+                        disabled={!canManage} onClick={() => handleDelete(vehicle.id)}
                         className="p-2.5 rounded-xl border border-red-200 text-red-700 hover:bg-red-50"
                         title="Excluir"
                       >
@@ -762,7 +769,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
               </h3>
             </div>
 
-            <form onSubmit={handlePersonalVehicleSubmit} className="space-y-4">
+            <form onSubmit={handlePersonalVehicleSubmit} className="space-y-4"><fieldset disabled={!canManage} className="contents">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Pessoa vinculada *</label>
                 <select
@@ -831,7 +838,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                   </button>
                 )}
               </div>
-            </form>
+            </fieldset></form>
           </section>
 
           <section className="xl:col-span-3 glass rounded-2xl p-6 shadow-premium">
@@ -890,7 +897,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
                         </button>
                         <button
                           type="button"
-                          onClick={() => startPersonalVehicleEdit(vehicle)}
+                          disabled={!canManage} onClick={() => startPersonalVehicleEdit(vehicle)}
                           className="p-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50"
                           title="Editar"
                         >
@@ -971,7 +978,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
               {qrGenerating ? (
                 <div className="py-24 text-sm text-gray-500">Gerando QR Code...</div>
               ) : qrDataUrl ? (
-                <img src={qrDataUrl} alt={`QR Code do veiculo ${qrVehicle.plate}`} className="h-64 w-64" />
+                <img src={qrDataUrl} alt={`QR Code do veiculo ${escapeHtml(qrVehicle.plate)}`} className="h-64 w-64" />
               ) : (
                 <div className="py-24 text-sm text-gray-500">QR indisponivel.</div>
               )}
@@ -981,7 +988,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
               <p className="text-sm font-semibold text-blue-900">Link permanente</p>
               <p className="mt-2 break-all text-sm text-blue-800">{getVehicleQrUrl(qrVehicle)}</p>
               <p className="mt-2 text-xs text-blue-700">
-                Este QR usa o codigo curto do veiculo. Ele continua funcionando enquanto o veiculo existir no banco e o dominio do Netlify continuar o mesmo.
+                  Este QR usa o código curto do veículo e o endereço autorizado deste ambiente. Confira o destino antes de compartilhar.
               </p>
             </div>
 
@@ -1028,7 +1035,7 @@ export function VehiclesView({ userRole, onSuccess, onError }: VehiclesViewProps
               {qrGenerating ? (
                 <div className="py-24 text-sm text-gray-500">Gerando QR Code...</div>
               ) : qrDataUrl ? (
-                <img src={qrDataUrl} alt={`QR Code do veiculo pessoal ${personalQrVehicle.plate}`} className="h-64 w-64" />
+                <img src={qrDataUrl} alt={`QR Code do veiculo pessoal ${escapeHtml(personalQrVehicle.plate)}`} className="h-64 w-64" />
               ) : (
                 <div className="py-24 text-sm text-gray-500">QR indisponivel.</div>
               )}
